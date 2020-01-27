@@ -122,9 +122,6 @@ config ZEN_INTERACTIVE
 	help
 	  Tunes the kernel for responsiveness at the cost of throughput and power usage.
 
-	  --- Virtual Memory Subsystem ---------------------------
-
-	    Background-reclaim hugepages...:   no   ->   yes
 
 config BROKEN
 	bool
