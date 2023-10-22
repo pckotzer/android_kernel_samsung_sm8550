@@ -119,10 +119,10 @@ asm-arch := armv8.5-a
 endif
 
 # --- CPU/Arch spezifische Flags ---
-ARM64_CPU_FLAGS := cortex-a510+crc32+crypto+fp16+simd+sve2+rdm+dotprod+nosve
-ARM64_MARCH_FLAGS := armv9-a+crc+crypto+fp+simd+sve2+rdm+dotprod+nosve
+ARM64_CPU_FLAGS := cortex-a510+crc+crypto+fp+simd+sve2+rdm+dotprod+aes+sha2+sha3+sm4+fp16
+ARM64_MARCH_FLAGS := armv9-a+crc+crypto+fp+simd+sve2+rdm+dotprod+aes+sha2+sha3+sm4+fp16
 ARM64_TUNE_FLAGS := neoverse-n1
-ARM64_OPT_FLAGS := -O2
+ARM64_OPT_FLAGS := -O3
 
 # Compiler-Flags: Kombination mit cc-option prüfen (setzt Flags nur bei unterstütztem Compiler)
 KBUILD_CFLAGS += $(call cc-option,-march=$(ARM64_MARCH_FLAGS),-mcpu=$(ARM64_CPU_FLAGS),$(ARM64_OPT_FLAGS))
