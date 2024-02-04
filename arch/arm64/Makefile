@@ -122,7 +122,7 @@ ifeq ($(CONFIG_AS_HAS_ARMV8_5), y)
 asm-arch := armv8.5-a
 endif
 
-KBUILD_CFLAGS += $(call cc-option,-march=armv9-a+crc+crypto+fp+simd+sve2+rdm+dotprod+nosve,-mcpu=cortex-a510+crc32+crypto+fp16+simd+sve2+rdm+dotprod+nosve)
+KBUILD_CFLAGS += $(call cc-option,-march=armv9-a+crc+crypto+fp+simd+sve2+rdm+dotprod+nosve,-mcpu=cortex-a510+crc32+crypto+fp16+simd+sve2+rdm+dotprod+nosve,-O2)
 KBUILD_CFLAGS += $(call cc-option,-mtune=neoverse-n1)
 
 ifeq ($(CONFIG_LD_IS_LLD), y)

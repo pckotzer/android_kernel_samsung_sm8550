@@ -3,6 +3,15 @@ if BLOCK
 
 menu "IO Schedulers"
 
+config IOSCHED_ANXIETY
+	tristate "Anxiety I/O scheduler"
+	default y
+	
+	---help---
+	  The Anxiety I/O scheduler prioritizes latency over everything
+	  else. When a request comes in, it will use a lighweight
+	  selection algorithm to swiftly process the current pending task.
+
 config MQ_IOSCHED_DEADLINE
 	tristate "MQ deadline I/O scheduler"
 	default y
