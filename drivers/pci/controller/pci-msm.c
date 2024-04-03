@@ -7128,7 +7128,7 @@ static void msm_handle_error_source(struct pci_dev *dev,
 	int aer = dev->aer_cap;
 	struct msm_pcie_dev_t *rdev = info->rdev;
 	u32 status, sev;
-	static int aer_counter;
+	static int __maybe_unused aer_counter;
 
 	if (!rdev->aer_dump && !rdev->suspending &&
 		rdev->link_status == MSM_PCIE_LINK_ENABLED) {
@@ -7169,12 +7169,16 @@ static void msm_handle_error_source(struct pci_dev *dev,
 					PCI_EXP_DEVSTA_FED);
 	} else {
 		/* AER_FATAL */
+#ifdef CONFIG_DEBUG_FS
 		if (aer_counter >= corr_counter_limit)
+#endif
 			panic("AER error severity %d\n", info->severity);
+#ifdef CONFIG_DEBUG_FS
 		else {
 			pr_err("AER error severity %d, aer_counter=%d\n", info->severity, aer_counter);
 			aer_counter++;
 		}
+#endif
 	}
 
 	pci_dev_put(dev);
