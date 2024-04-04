@@ -18,6 +18,16 @@ config WIRELESS_CHARGER_S2MIW04
 	  S2MIW04 MFC include wireless charger driver.
 	  It is for LSI.
 
+config WIRELESS_CHARGER_CPS4038
+	tristate "MFC IC CPS4038 charger support"
+	select WIRELESS_CHARGING
+	depends on BATTERY_SAMSUNG && I2C
+	help
+	  Say Y here, to enable
+	  support for the CPS4038 MFC IC
+	  CPS4038 MFC include wireless charger driver.
+	  It is for CPS(Conveninet Power Systems).
+
 config WIRELESS_NO_HV
 	bool "wireless no hv"
 	depends on BATTERY_SAMSUNG && I2C
