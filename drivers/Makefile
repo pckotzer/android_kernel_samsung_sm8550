@@ -217,6 +217,7 @@ obj-y				+= mfd/maxim/
 obj-y				+= battery/common/
 obj-y				+= nfc/snvm/
 obj-y				+= regulator/s2dos05/
+obj-y				+= input/wacom/
 obj-y				+= usb/typec/maxim/
 obj-y				+= regulator/s2mpb02/
 obj-y				+= uwb/
