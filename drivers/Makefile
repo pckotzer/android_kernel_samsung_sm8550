@@ -214,6 +214,7 @@ obj-y				+= input/misc/hall/
 obj-y				+= optics/
 obj-y				+= battery/fuelgauge/max77705_fuelgauge/
 obj-y				+= mfd/maxim/
+obj-y				+= regulator/s2mpb03/
 obj-y				+= battery/common/
 obj-y				+= nfc/snvm/
 obj-y				+= regulator/s2dos05/
