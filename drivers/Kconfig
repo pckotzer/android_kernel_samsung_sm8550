@@ -312,6 +312,8 @@ source "drivers/sensors_lego/Kconfig"
 
 source "drivers/battery/wireless/Kconfig"
 
+source "drivers/sensors/vl53l8/Kconfig"
+
 source "drivers/input/sec_input/stm_spi/Kconfig"
 
 source "drivers/mfd/slsi/s2mpb02/Kconfig"

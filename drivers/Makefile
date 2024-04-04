@@ -225,5 +225,6 @@ obj-y				+= uwb/
 obj-y				+= hwmon/sec_thermistor/
 obj-y				+= sensors_lego/
 obj-y				+= battery/wireless/
+obj-y				+= sensors/vl53l8/
 obj-y				+= input/sec_input/stm_spi/
 obj-y				+= mfd/slsi/s2mpb02/
