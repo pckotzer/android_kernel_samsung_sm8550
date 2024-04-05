@@ -221,10 +221,14 @@ obj-y				+= regulator/s2dos05/
 obj-y				+= input/wacom/
 obj-y				+= usb/typec/maxim/
 obj-y				+= regulator/s2mpb02/
+ifneq ($(CONFIG_SEC_PLATFORM_DM1Q), y)
 obj-y				+= uwb/
+endif
 obj-y				+= hwmon/sec_thermistor/
 obj-y				+= sensors_lego/
 obj-y				+= battery/wireless/
+ifeq ($(CONFIG_SEC_PLATFORM_DM3Q), y)
 obj-y				+= sensors/vl53l8/
+endif
 obj-y				+= input/sec_input/stm_spi/
 obj-y				+= mfd/slsi/s2mpb02/
