@@ -396,6 +396,7 @@ static int queuecommand_lck(struct scsi_cmnd *srb,
 	}
 
 	/* enqueue the command and wake up the control thread */
+	srb->scsi_done = done;
 	us->srb = srb;
 	complete(&us->cmnd_ready);
 
