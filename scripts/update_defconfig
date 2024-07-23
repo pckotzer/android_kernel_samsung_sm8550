@@ -12,10 +12,10 @@ export krnl_top
 export krnl_config_dir
 
 # Set compiler PATH
-if [[ -d $HOME/clang/bin ]]; then
-	PATH=$HOME/clang/bin:$PATH
+if [[ -d ${krnl_top}/../../../prebuilts/clang/host/linux-x86/clang-r522817/bin ]]; then
+	PATH=${krnl_top}/../../../prebuilts/clang/host/linux-x86/clang-r522817/bin:$PATH
 	use_llvm=1
-	echo "Using Clang from $HOME/clang/bin"
+	echo "Using Clang from Android Clang/LLVM Prebuilts"
 elif command -v clang >/dev/null 2>&1; then
 	use_llvm=1
 	echo "Using Clang from $(command -v clang)"
@@ -64,8 +64,8 @@ run_merge_config() {
 		-O "${out_dir}" \
 		"${krnl_config_dir}/../../gki_defconfig" \
 		"${krnl_config_dir}/../${soc}_GKI.config" \
-		"${krnl_config_dir}/../debugfs.config" \
 		"${krnl_config_dir}/${soc}_GKI_sec.config" \
+		"${krnl_config_dir}/../debugfs.config" \
 		"${krnl_config_dir}/${device}.config")
 
 	case "$ret" in
