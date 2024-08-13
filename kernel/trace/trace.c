@@ -8189,20 +8189,6 @@ tracing_buffers_read(struct file *filp, char __user *ubuf,
 	return size;
 }
 
-static int tracing_buffers_flush(struct file *file, fl_owner_t id)
-{
-	struct ftrace_buffer_info *info = file->private_data;
-	struct trace_iterator *iter = &info->iter;
-
-	iter->wait_index++;
-	/* Make sure the waiters see the new wait_index */
-	smp_wmb();
-
-	ring_buffer_wake_waiters(iter->array_buffer->buffer, iter->cpu_file);
-
-	return 0;
-}
-
 static int tracing_buffers_release(struct inode *inode, struct file *file)
 {
 	struct ftrace_buffer_info *info = file->private_data;
@@ -8397,7 +8383,6 @@ static const struct file_operations tracing_buffers_fops = {
 	.read		= tracing_buffers_read,
 	.poll		= tracing_buffers_poll,
 	.release	= tracing_buffers_release,
-	.flush		= tracing_buffers_flush,
 	.splice_read	= tracing_buffers_splice_read,
 	.llseek		= no_llseek,
 };
