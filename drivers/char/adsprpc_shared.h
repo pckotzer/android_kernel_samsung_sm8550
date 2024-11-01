@@ -1062,6 +1062,9 @@ struct fastrpc_mmap {
 	uint32_t pid;           /* alloc real pid */
 	char comm[TASK_COMM_LEN];
 #endif
+
+	/* Map in use for dma handle */
+	unsigned int dma_handle_refs;
 };
 
 enum fastrpc_perfkeys {
