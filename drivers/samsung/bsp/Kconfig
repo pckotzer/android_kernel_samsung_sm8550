@@ -21,3 +21,5 @@ config SAMSUNG_PRODUCT_SHIP
 	default n
 
 source "drivers/samsung/bsp/class/Kconfig"
+source "drivers/samsung/bsp/param/Kconfig"
+source "drivers/samsung/bsp/qcom/Kconfig"

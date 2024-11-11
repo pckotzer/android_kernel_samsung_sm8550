@@ -1,0 +1,6 @@
+source "drivers/samsung/debug/common/Kconfig"
+source "drivers/samsung/debug/reboot_cmd/Kconfig"
+
+source "drivers/samsung/debug/arm64/Kconfig"
+
+source "drivers/samsung/debug/qcom/Kconfig"
