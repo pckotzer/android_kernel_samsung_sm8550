@@ -156,7 +156,7 @@ config USB_LPM_CHARGING_SYNC
 config DISABLE_LOCKSCREEN_USB_RESTRICTION
 	bool "disable usb restriction during lockscreen"
 	depends on USB_NOTIFY_LAYER
-	default y
+	default n
 	help
 	 Restricting the usb function on the lock screen is a concept applied for usb security
 	 it has been applied since v os (oneui 7.0) or higher
