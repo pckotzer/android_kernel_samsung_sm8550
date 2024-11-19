@@ -11040,6 +11040,7 @@ static void _nohz_idle_balance(struct rq *this_rq, unsigned int flags,
 	bool has_blocked_load = false;
 	int update_next_balance = 0;
 	int this_cpu = this_rq->cpu;
+	int this_cpu = this_rq->cpu;
 	int balance_cpu;
 	struct rq *rq;
 
