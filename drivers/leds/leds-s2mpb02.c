@@ -549,7 +549,7 @@ ssize_t s2mpb02_store(const char *buf)
 		onoff = S2MPB02_FLASH_OUT_I_300MA;
 	} else if (onoff == 1001) {
 		// level 1 (Flashlight level 1)
-		onoff = S2MPB02_TORCH_OUT_I_40MA;
+		onoff = S2MPB02_TORCH_OUT_I_MAX;
 #if defined(CONFIG_SEC_BEYONDXQ_PROJECT)
 		onoff = S2MPB02_TORCH_OUT_I_60MA;
 #endif
@@ -585,7 +585,7 @@ ssize_t s2mpb02_store(const char *buf)
 		onoff = S2MPB02_TORCH_OUT_I_180MA;
 	} else if (onoff == 1009) {
 		// level 9 (Flashlight level 5)
-		onoff = S2MPB02_TORCH_OUT_I_200MA;
+		onoff = S2MPB02_TORCH_OUT_I_MAX;
 #if defined(CONFIG_SEC_BEYONDXQ_PROJECT)
 		onoff = S2MPB02_TORCH_OUT_I_300MA;
 #endif
