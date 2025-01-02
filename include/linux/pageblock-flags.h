@@ -43,10 +43,12 @@ extern unsigned int pageblock_order;
 #endif /* CONFIG_HUGETLB_PAGE_SIZE_VARIABLE */
 
 #else /* CONFIG_HUGETLB_PAGE */
-
+#ifdef CONFIG_ZEN_INTERACTIVE
+#define pageblock_order		PAGE_ALLOC_COSTLY_ORDER
+#else
 /* If huge pages are not used, group by MAX_ORDER_NR_PAGES */
 #define pageblock_order		(MAX_ORDER-1)
-
+#endif
 #endif /* CONFIG_HUGETLB_PAGE */
 
 #define pageblock_nr_pages	(1UL << pageblock_order)
