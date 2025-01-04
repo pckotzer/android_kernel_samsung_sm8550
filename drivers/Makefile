@@ -222,7 +222,6 @@ obj-y				+= regulator/s2dos05/
 obj-y				+= input/wacom/
 obj-y				+= usb/typec/maxim/
 obj-y				+= regulator/s2mpb02/
-obj-$(CONFIG_KSU) += kernelsu/
 ifneq ($(CONFIG_SEC_PLATFORM_DM1Q), y)
 obj-y				+= uwb/
 endif
