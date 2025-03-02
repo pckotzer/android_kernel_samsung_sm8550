@@ -156,36 +156,42 @@ function generate_modules_load() {
 
     #
     # First stage modules
-    # Get modules from FIRST_STAGE_MODULES_LIST and remove non existing ones
     #
     echo "Generating first stage modules list at $OUT_DIR/modules.load.first_stage"
     for mod in $(cat $FIRST_STAGE_MODULES_LIST); do
         if [[ "$(grep -e "^$mod:" -e "/$mod:" $(get_modlib_file_path modules.dep))" != "" ]]; then
-            generate_module_deps $mod $OUT_DIR/modules.load.first_stage
+            generate_module_deps $mod $OUT_DIR/modules.load.vendor_boot
         fi
     done
 
     #
-    # Recovery modules (first stage + ext recovery modules)
+    # Recovery modules
     #
     echo "Generating recovery modules list at $OUT_DIR/modules.load.recovery"
     cat $modules_order_file | rev | cut -d / -f 1 | rev > $OUT_DIR/modules.load.recovery
     for ext_mod in $RECOVERY_EXT_MODULES; do
         generate_module_deps $ext_mod $OUT_DIR/modules.load.recovery
     done
+    sed -i '/zram.ko/d; /zsmalloc.ko/d' $OUT_DIR/modules.load.recovery
 
     #
-    # Vendor DLKM modules (non-first-stage modules + extra/ modules)
+    # Vendor DLKM modules
     #
-    echo "Generating vendor DLKM modules list at $OUT_DIR/modules.load.vendor_dlkm"
+    echo "Generating vendor DLKM modules list at $OUT_DIR/modules.load"
     ext_modules=$(cat $modules_dep_file | cut -d ":" -f 1)
     for ext_mod in $ext_modules; do
-        generate_module_deps $ext_mod $OUT_DIR/modules.load.vendor_dlkm
+    generate_module_deps $ext_mod $OUT_DIR/modules.load
     done
 
+    sed -i '/zram.ko/d; /zsmalloc.ko/d' $OUT_DIR/modules.load
+
+   # Die echo-Liste erst jetzt anhängen
+
+    #
     # Remove first stage modules from vendor_dlkm
-    for mod in $(cat $OUT_DIR/modules.load.first_stage); do
-        sed -i /$mod/d $OUT_DIR/modules.load.vendor_dlkm
+    #
+    for mod in $(cat $OUT_DIR/modules.load.vendor_boot); do
+        sed -i "/$mod/d" $OUT_DIR/modules.load
     done
 }
 
@@ -215,4 +221,4 @@ done
 
 section "Generating modules.load files"
 generate_modules_load
-
+    echo -e "debugcc-kalama.ko\nsched-walt.ko" >> $OUT_DIR/modules.load
