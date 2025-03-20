@@ -10,14 +10,34 @@
 #
 # Copyright (C) 1995-2001 by Russell King
 
-LDFLAGS_vmlinux	:=--no-undefined -X --pic-veneer
+LDFLAGS_vmlinux	:=--no-undefined -X --pic-veneer -pie --lto-O3
 
 ifeq ($(CONFIG_RELOCATABLE), y)
 # Pass --no-apply-dynamic-relocs to restore pre-binutils-2.27 behaviour
 # for relative relocs, since this leads to better Image compression
 # with the relocation offsets always being zero.
-LDFLAGS_vmlinux		+= -shared -Bsymbolic -z notext \
+LDFLAGS_vmlinux		+= -Bsymbolic -z notext \
 			$(call ld-option, --no-apply-dynamic-relocs)
+
+			# Pass -shared for bfd and -pie for lld to minimize Image size on both
+ 
+
+ifeq ($(ld-name),bfd)
+ 
+
+LDFLAGS_vmlinux		+= -shared
+ 
+
+endif
+ 
+
+ifeq ($(ld-name),lld)
+ 
+
+LDFLAGS_vmlinux		+= -pie
+ 
+
+endif
 endif
 
 ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
@@ -102,11 +122,11 @@ ifeq ($(CONFIG_AS_HAS_ARMV8_5), y)
 asm-arch := armv8.5-a
 endif
 
-KBUILD_CFLAGS += $(call cc-option,-mcpu=cortex-a510+crypto+crc,-march=armv9-a+crc+crypto+fp16+simd+sve2+rdm+dotprod+nosve)
+KBUILD_CFLAGS += $(call cc-option,-march=armv9-a+crc+crypto+fp+simd+sve2+rdm+dotprod+nosve,-mcpu=cortex-a510+crc32+crypto+fp16+simd+sve2+rdm+dotprod+nosve)
 KBUILD_CFLAGS += $(call cc-option,-mtune=neoverse-n1)
 
 ifeq ($(CONFIG_LD_IS_LLD), y)
-KBUILD_LDFLAGS  += -mllvm -march=armv9-a+crc+crypto+fp16+simd+sve2+rdm+dotprod+nosve -mcpu=cortex-a510
+KBUILD_LDFLAGS  += -mllvm -march=armv9-a+crc+crypto+fp+simd+sve2+rdm+dotprod+nosve -mcpu=cortex-a510+crc32+crypto+fp16+simd+sve2+rdm+dotprod+nosve -O2
 endif
 
 ifeq ($(CONFIG_SHADOW_CALL_STACK), y)
