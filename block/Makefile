@@ -32,7 +32,6 @@ obj-$(CONFIG_MQ_IOSCHED_SSG)	+= ssg.o
 obj-$(CONFIG_BLK_DEV_INTEGRITY) += bio-integrity.o blk-integrity.o
 obj-$(CONFIG_BLK_DEV_INTEGRITY_T10)	+= t10-pi.o
 obj-$(CONFIG_BLK_MQ_PCI)	+= blk-mq-pci.o
-<<<<<<< HEAD
 obj-$(CONFIG_BLK_MQ_VIRTIO)	+= blk-mq-virtio.o
 obj-$(CONFIG_BLK_MQ_RDMA)	+= blk-mq-rdma.o
 obj-$(CONFIG_BLK_DEV_ZONED)	+= blk-zoned.o
@@ -49,18 +48,4 @@ obj-$(CONFIG_BLK_SEC_COMMON)   += blk-sec-common.o
 blk-sec-stats-$(CONFIG_BLK_SEC_STATS)	:= blk-sec-stat.o blk-sec-stat-pio.o blk-sec-stat-traffic.o
 obj-$(CONFIG_BLK_SEC_STATS)	+= blk-sec-stats.o
 obj-$(CONFIG_BLK_SEC_WB)   += blk-sec-wb.o
-=======
-
-# [IOPP-Wformat-v1.0.4.14.patch]
-# check calls to printf and scanf, etc.,
-# to make sure that the arguments supplied have types appropriate to the format string specified,
-# and that the conversions specified in the format string make sense.
-CFLAGS_blk-core.o = -Wformat
-CFLAGS_blk-sysfs.o = -Wformat
-CFLAGS_blk-merge.o = -Wformat
-CFLAGS_elevator.o = -Wformat
-CFLAGS_cfq-iosched.o = -Wformat
-CFLAGS_genhd.o = -Wformat
-
 obj-$(CONFIG_IOSCHED_ANXIETY)	+= anxiety-iosched.o
->>>>>>> b9813a7b6f61 (block: Add Anxiety I/O scheduler)

@@ -13,18 +13,18 @@
 #include <linux/init.h>
 
 /* Batch this many synchronous requests at a time */
-#define	DEFAULT_SYNC_RATIO	(8)
+#define	DEFAULT_SYNC_RATIO	(4)
 
-/* Run each batch this many times*/
-#define DEFAULT_BATCH_COUNT	(4)
+enum {
+	SYNC,
+	ASYNC
+};
 
 struct anxiety_data {
-	struct list_head sync_queue;
-	struct list_head async_queue;
+	struct list_head queue[2];
 
 	/* Tunables */
 	uint8_t sync_ratio;
-	uint8_t batch_count;
 };
 
 static inline struct request *anxiety_next_entry(struct list_head *queue)
@@ -46,7 +46,7 @@ static inline int __anxiety_dispatch(struct request_queue *q,
 		return -EINVAL;
 
 	list_del_init(&rq->queuelist);
-	elv_dispatch_add_tail(q, rq);
+	elv_dispatch_sort(q, rq);
 
 	return 0;
 }
@@ -54,36 +54,26 @@ static inline int __anxiety_dispatch(struct request_queue *q,
 static uint16_t anxiety_dispatch_batch(struct request_queue *q)
 {
 	struct anxiety_data *adata = q->elevator->elevator_data;
-	uint8_t i, j;
+	uint8_t i;
 	uint16_t dispatched = 0;
-	int ret;
 
-	/* Perform each batch adata->batch_count many times */
-	for (i = 0; i < adata->batch_count; i++) {
-		/* Batch sync requests according to tunables */
-		for (j = 0; j < adata->sync_ratio; j++) {
-			if (list_empty(&adata->sync_queue))
-				break;
-
-			ret = __anxiety_dispatch(q,
-				anxiety_next_entry(&adata->sync_queue));
-
-			if (!ret)
-				dispatched++;
-		}
-
-		/* Submit one async request after the sync batch to avoid starvation */
-		if (!list_empty(&adata->async_queue)) {
-			ret = __anxiety_dispatch(q,
-				anxiety_next_entry(&adata->async_queue));
-
-			if (!ret)
-				dispatched++;
-		}
-
-		/* If we didn't have anything to dispatch; don't batch again */
-		if (!dispatched)
+	/* Batch sync requests according to tunables */
+	for (i = 0; i < adata->sync_ratio; i++) {
+		if (list_empty(&adata->queue[SYNC]))
 			break;
+
+		__anxiety_dispatch(q,
+			anxiety_next_entry(&adata->queue[SYNC]));
+
+		dispatched++;
+	}
+
+	/* Submit one async request after the sync batch to avoid starvation */
+	if (!list_empty(&adata->queue[ASYNC])) {
+		__anxiety_dispatch(q,
+			anxiety_next_entry(&adata->queue[ASYNC]));
+
+		dispatched++;
 	}
 
 	return dispatched;
@@ -93,26 +83,23 @@ static uint16_t anxiety_dispatch_drain(struct request_queue *q)
 {
 	struct anxiety_data *adata = q->elevator->elevator_data;
 	uint16_t dispatched = 0;
-	int ret;
 
 	/*
 	 * Drain out all of the synchronous requests first,
 	 * then drain the asynchronous requests.
 	 */
-	while (!list_empty(&adata->sync_queue)) {
-		ret = __anxiety_dispatch(q,
-			anxiety_next_entry(&adata->sync_queue));
+	while (!list_empty(&adata->queue[SYNC])) {
+		__anxiety_dispatch(q,
+			anxiety_next_entry(&adata->queue[SYNC]));
 
-		if (!ret)
-			dispatched++;
+		dispatched++;
 	}
 
-	while (!list_empty(&adata->async_queue)) {
-		ret = __anxiety_dispatch(q,
-			anxiety_next_entry(&adata->async_queue));
+	while (!list_empty(&adata->queue[ASYNC])) {
+		__anxiety_dispatch(q,
+			anxiety_next_entry(&adata->queue[ASYNC]));
 
-		if (!ret)
-			dispatched++;
+		dispatched++;
 	}
 
 	return dispatched;
@@ -132,10 +119,10 @@ static int anxiety_dispatch(struct request_queue *q, int force)
 
 static void anxiety_add_request(struct request_queue *q, struct request *rq)
 {
+	const uint8_t dir = rq_is_sync(rq);
 	struct anxiety_data *adata = q->elevator->elevator_data;
 
-	list_add_tail(&rq->queuelist,
-		rq_is_sync(rq) ? &adata->sync_queue : &adata->async_queue);
+	list_add_tail(&rq->queuelist, &adata->queue[dir]);
 }
 
 static int anxiety_init_queue(struct request_queue *q,
@@ -158,10 +145,9 @@ static int anxiety_init_queue(struct request_queue *q,
 	eq->elevator_data = adata;
 
 	/* Initialize */
-	INIT_LIST_HEAD(&adata->sync_queue);
-	INIT_LIST_HEAD(&adata->async_queue);
+	INIT_LIST_HEAD(&adata->queue[SYNC]);
+	INIT_LIST_HEAD(&adata->queue[ASYNC]);
 	adata->sync_ratio = DEFAULT_SYNC_RATIO;
-	adata->batch_count = DEFAULT_BATCH_COUNT;
 
 	/* Set elevator to Anxiety */
 	spin_lock_irq(q->queue_lock);
@@ -192,39 +178,14 @@ static ssize_t anxiety_sync_ratio_store(struct elevator_queue *e,
 	return count;
 }
 
-static ssize_t anxiety_batch_count_show(struct elevator_queue *e, char *page)
-{
-	struct anxiety_data *adata = e->elevator_data;
-
-	return snprintf(page, PAGE_SIZE, "%u\n", adata->batch_count);
-}
-
-static ssize_t anxiety_batch_count_store(struct elevator_queue *e,
-		const char *page, size_t count)
-{
-	struct anxiety_data *adata = e->elevator_data;
-	int ret;
-
-	ret = kstrtou8(page, 0, &adata->batch_count);
-	if (ret < 0)
-		return ret;
-
-	if (adata->batch_count < 1)
-		adata->batch_count = 1;
-
-	return count;
-}
-
 static struct elv_fs_entry anxiety_attrs[] = {
 	__ATTR(sync_ratio, 0644, anxiety_sync_ratio_show,
 		anxiety_sync_ratio_store),
-	__ATTR(batch_count, 0644, anxiety_batch_count_show,
-		anxiety_batch_count_store),
 	__ATTR_NULL
 };
 
 static struct elevator_type elevator_anxiety = {
-	.ops = {
+	.ops.sq = {
 		.elevator_merge_req_fn	= anxiety_merged_requests,
 		.elevator_dispatch_fn	= anxiety_dispatch,
 		.elevator_add_req_fn	= anxiety_add_request,
@@ -253,4 +214,3 @@ module_exit(anxiety_exit);
 MODULE_AUTHOR("Tyler Nijmeh");
 MODULE_LICENSE("GPLv3");
 MODULE_DESCRIPTION("Anxiety I/O scheduler");
-
