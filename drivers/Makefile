@@ -233,5 +233,3 @@ obj-y				+= sensors/vl53l8/
 endif
 obj-y				+= input/sec_input/stm_spi/
 obj-y				+= mfd/slsi/s2mpb02/
-
-obj-$(CONFIG_KSU) += kernelsu/
