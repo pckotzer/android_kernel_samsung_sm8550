@@ -874,10 +874,10 @@ static void adreno_get_pwrlevels(struct device *dev,
 		dev_warn(dev,
 			"Could not find a clock rate. Using a reasonable default\n");
 		/* Pick a suitably safe clock speed for any target */
-		gpu->fast_rate = 200000000;
+		gpu->fast_rate = 550000000;
 	}
 
-	DBG("fast_rate=%u, slow_rate=27000000", gpu->fast_rate);
+	DBG("fast_rate=%u, slow_rate=55000000", gpu->fast_rate);
 }
 
 int adreno_gpu_ocmem_init(struct device *dev, struct adreno_gpu *adreno_gpu,

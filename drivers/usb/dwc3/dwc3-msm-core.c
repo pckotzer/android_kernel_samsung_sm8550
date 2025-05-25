@@ -131,7 +131,6 @@
 #define PWR_EVNT_LPM_OUT_RX_ELECIDLE_IRQ_MASK	BIT(12)
 #define PWR_EVNT_LPM_OUT_L1_MASK		BIT(13)
 
-
 #define DWC31_LINK_LLUCTL(n) (0xd024 + ((n) * 0x80))
 #define FORCE_GEN1_MASK BIT(10)
 
@@ -682,6 +681,7 @@ struct dwc3_msm {
 	struct if_cb_manager	*man;
 #endif
 	int cc_dir;
+
 };
 
 static void toggle_timer(struct dwc3_msm *mdwc, bool toggle)
