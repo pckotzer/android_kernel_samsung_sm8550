@@ -99,26 +99,21 @@ asm-arch := armv8.5-a
 endif
 
 # --- CPU/Arch specific Flags ---
-ARM64_CPU_FLAGS := cortex-a510+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+bf16
-ARM64_MARCH_FLAGS := armv9-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+bf16
-ARM64_TUNE_FLAGS := cortex-a510
-ARM64_OPT_FLAGS := -O2
+ARM64_CPU_FLAGS := cotrex-a710+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+nosve
+ARM64_MARCH_FLAGS := armv9.2-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm
+ARM64_TUNE_FLAGS := neoverse-n2
+ARM64_OPT_FLAGS := -O3 -fvectorize -fslp-vectorize -ffunction-sections -fdata-sections
 
-KBUILD_CFLAGS += $(call cc-option,-march=$(ARM64_MARCH_FLAGS),-mcpu=$(ARM64_CPU_FLAGS),$(ARM64_OPT_FLAGS))
+KBUILD_CFLAGS += $(call cc-option,-march=$(ARM64_MARCH_FLAGS))
+KBUILD_CFLAGS += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
 KBUILD_CFLAGS += $(call cc-option,-mtune=$(ARM64_TUNE_FLAGS))
+KBUILD_CFLAGS += $(ARM64_OPT_FLAGS)
+KBUILD_CFLAGS += $(call cc-option,-falign-functions=16)
 
 # Linker Flags (for LLD)
 ifeq ($(CONFIG_LD_IS_LLD), y)
-LDFLAGS_LLD := -mllvm -march=$(ARM64_MARCH_FLAGS) -mcpu=$(ARM64_CPU_FLAGS) $(ARM64_OPT_FLAGS) 
-KBUILD_LDFLAGS += $(LDFLAGS_LLD)
-endif
-
-KBUILD_CFLAGS += $(call cc-option,-march=$(ARM64_MARCH_FLAGS),-mcpu=$(ARM64_CPU_FLAGS),$(ARM64_OPT_FLAGS))
-KBUILD_CFLAGS += $(call cc-option,-mtune=$(ARM64_TUNE_FLAGS))
-
-# Linker Flags (für LLD)
-ifeq ($(CONFIG_LD_IS_LLD), y)
-LDFLAGS_LLD := -mllvm -march=$(ARM64_MARCH_FLAGS) -mcpu=$(ARM64_CPU_FLAGS) $(ARM64_OPT_FLAGS) 
+# Füge --gc-sections hinzu, um ungenutzten Code zu entfernen
+LDFLAGS_LLD := -mllvm -march=$(ARM64_MARCH_FLAGS) -mllvm -polly-run-dce
 KBUILD_LDFLAGS += $(LDFLAGS_LLD)
 endif
 KBUILD_CFLAGS   += $(call cc-option,-frename-registers)
