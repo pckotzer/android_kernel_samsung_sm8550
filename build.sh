@@ -2,14 +2,16 @@
 
 set -e
 
-KERNEL_TOOLS=/mnt/guckesh/Crdroid/prebuilts/kernel-build-tools/linux-x86/bin/
-CLANG_PATH=/mnt/guckesh/Crdroid/prebuilts/clang/host/linux-x86/clang-r522817/bin/
+KERNEL_TOOLS=/mnt/nvme/prebuilts/kernel-build-tools/linux-x86/bin/
+CLANG_PATH=/mnt/nvme/prebuilts/clang/host/linux-x86/clang-r547379/bin/
 
 export PATH="$KERNEL_TOOLS:$CLANG_PATH:$PATH"
 
 TARGET=$1
+ACTION=$2  # Optional second argument, e.g. "menuconfig"
+
 if [[ -z "$TARGET" ]]; then
-    echo "Usage: $0 <target>"
+    echo "Usage: $0 <target> [menuconfig]"
     exit 1
 fi
 
@@ -25,56 +27,10 @@ RECOVERY_EXT_MODULES="msm_drm.ko"
 
 case "$TARGET" in
     dm1q|dm2q)
-        TARGET_KERNEL_EXT_MODULES="
-            qcom/opensource/mmrm-driver
-            qcom/opensource/mm-drivers/hw_fence
-            qcom/opensource/mm-drivers/msm_ext_display
-            qcom/opensource/mm-drivers/sync_fence
-            qcom/opensource/audio-kernel
-            qcom/opensource/camera-kernel
-            qcom/opensource/dataipa/drivers/platform/msm
-            qcom/opensource/datarmnet/core
-            qcom/opensource/datarmnet-ext/aps
-            qcom/opensource/datarmnet-ext/offload
-            qcom/opensource/datarmnet-ext/shs
-            qcom/opensource/datarmnet-ext/perf
-            qcom/opensource/datarmnet-ext/perf_tether
-            qcom/opensource/datarmnet-ext/sch
-            qcom/opensource/datarmnet-ext/wlan
-            qcom/opensource/securemsm-kernel
-            qcom/opensource/display-drivers/msm
-            qcom/opensource/eva-kernel
-            qcom/opensource/video-driver
-            qcom/opensource/graphics-kernel
-            qcom/opensource/wlan/platform
-            qcom/opensource/wlan/qcacld-3.0/.qca6490
-            qcom/opensource/bt-kernel"
+        TARGET_KERNEL_EXT_MODULES="qcom/opensource/mmrm-driver qcom/opensource/mm-drivers/hw_fence qcom/opensource/mm-drivers/msm_ext_display qcom/opensource/mm-drivers/sync_fence qcom/opensource/audio-kernel qcom/opensource/camera-kernel qcom/opensource/dataipa/drivers/platform/msm qcom/opensource/datarmnet/core qcom/opensource/datarmnet-ext/aps qcom/opensource/datarmnet-ext/offload qcom/opensource/datarmnet-ext/shs qcom/opensource/datarmnet-ext/perf qcom/opensource/datarmnet-ext/perf_tether qcom/opensource/datarmnet-ext/sch qcom/opensource/datarmnet-ext/wlan qcom/opensource/securemsm-kernel qcom/opensource/display-drivers/msm qcom/opensource/eva-kernel qcom/opensource/video-driver qcom/opensource/graphics-kernel qcom/opensource/wlan/platform qcom/opensource/wlan/qcacld-3.0/.qca6490 qcom/opensource/bt-kernel"
         ;;
     dm3q)
-        TARGET_KERNEL_EXT_MODULES="
-            qcom/opensource/mmrm-driver
-            qcom/opensource/mm-drivers/hw_fence
-            qcom/opensource/mm-drivers/msm_ext_display
-            qcom/opensource/mm-drivers/sync_fence
-            qcom/opensource/audio-kernel
-            qcom/opensource/camera-kernel
-            qcom/opensource/dataipa/drivers/platform/msm
-            qcom/opensource/datarmnet/core
-            qcom/opensource/datarmnet-ext/aps
-            qcom/opensource/datarmnet-ext/offload
-            qcom/opensource/datarmnet-ext/shs
-            qcom/opensource/datarmnet-ext/perf
-            qcom/opensource/datarmnet-ext/perf_tether
-            qcom/opensource/datarmnet-ext/sch
-            qcom/opensource/datarmnet-ext/wlan
-            qcom/opensource/securemsm-kernel
-            qcom/opensource/display-drivers/msm
-            qcom/opensource/eva-kernel
-            qcom/opensource/video-driver
-            qcom/opensource/graphics-kernel
-            qcom/opensource/wlan/platform
-            qcom/opensource/wlan/qcacld-3.0/.kiwi_v2
-            qcom/opensource/bt-kernel"
+        TARGET_KERNEL_EXT_MODULES="qcom/opensource/mmrm-driver qcom/opensource/mm-drivers/hw_fence qcom/opensource/mm-drivers/msm_ext_display qcom/opensource/mm-drivers/sync_fence qcom/opensource/audio-kernel qcom/opensource/camera-kernel qcom/opensource/dataipa/drivers/platform/msm qcom/opensource/datarmnet/core qcom/opensource/datarmnet-ext/aps qcom/opensource/datarmnet-ext/offload qcom/opensource/datarmnet-ext/shs qcom/opensource/datarmnet-ext/perf qcom/opensource/datarmnet-ext/perf_tether qcom/opensource/datarmnet-ext/sch qcom/opensource/datarmnet-ext/wlan qcom/opensource/securemsm-kernel qcom/opensource/display-drivers/msm qcom/opensource/eva-kernel qcom/opensource/video-driver qcom/opensource/graphics-kernel qcom/opensource/wlan/platform qcom/opensource/wlan/qcacld-3.0/.kiwi_v2 qcom/opensource/bt-kernel"
         ;;
     *)
         echo "Error: Unknown target $TARGET"
@@ -85,7 +41,6 @@ esac
 function section() {
     local input="$1"
     local length=${#input}
-
     printf '%*s\n' "$length" '' | tr ' ' '='
     echo "$input"
     printf '%*s\n' "$length" '' | tr ' ' '='
@@ -142,7 +97,6 @@ function generate_module_deps() {
 
     echo $module_name >> $2
 
-    # Generate the module dependencies
     module_deps=$(echo $module_data | cut -d ":" -f 2)
     for dep in $module_deps; do
         generate_module_deps $dep $2
@@ -154,19 +108,13 @@ function generate_modules_load() {
     modules_dep_file=$(get_modlib_file_path modules.dep)
     rm -f $OUT_DIR/modules.load.*
 
-    #
-    # First stage modules
-    #
-    echo "Generating first stage modules list at $OUT_DIR/modules.load.first_stage"
+    echo "Generating first stage modules list at $OUT_DIR/modules.load.vendor_boot"
     for mod in $(cat $FIRST_STAGE_MODULES_LIST); do
         if [[ "$(grep -e "^$mod:" -e "/$mod:" $(get_modlib_file_path modules.dep))" != "" ]]; then
             generate_module_deps $mod $OUT_DIR/modules.load.vendor_boot
         fi
     done
 
-    #
-    # Recovery modules
-    #
     echo "Generating recovery modules list at $OUT_DIR/modules.load.recovery"
     cat $modules_order_file | rev | cut -d / -f 1 | rev > $OUT_DIR/modules.load.recovery
     for ext_mod in $RECOVERY_EXT_MODULES; do
@@ -174,22 +122,14 @@ function generate_modules_load() {
     done
     sed -i '/zram.ko/d; /zsmalloc.ko/d' $OUT_DIR/modules.load.recovery
 
-    #
-    # Vendor DLKM modules
-    #
     echo "Generating vendor DLKM modules list at $OUT_DIR/modules.load"
     ext_modules=$(cat $modules_dep_file | cut -d ":" -f 1)
     for ext_mod in $ext_modules; do
-    generate_module_deps $ext_mod $OUT_DIR/modules.load
+        generate_module_deps $ext_mod $OUT_DIR/modules.load
     done
 
     sed -i '/zram.ko/d; /zsmalloc.ko/d' $OUT_DIR/modules.load
 
-   # Die echo-Liste erst jetzt anhängen
-
-    #
-    # Remove first stage modules from vendor_dlkm
-    #
     for mod in $(cat $OUT_DIR/modules.load.vendor_boot); do
         sed -i "/$mod/d" $OUT_DIR/modules.load
     done
@@ -201,7 +141,23 @@ if [[ -z $TARGET_DEFCONFIG ]] || [[ -z $TARGET_KERNEL_EXT_MODULES ]] || [[ -z $T
 fi
 
 section "Kernel config"
-make O=$O ARCH=arm64 $TARGET_DEFCONFIG
+if [[ "$ACTION" == "menuconfig" ]]; then
+    CUSTOM_CONFIG="/mnt/nvme/kernel/samsung/sm8550/arch/arm64/configs/dm1q_defconfig"
+    echo "Using custom config: $CUSTOM_CONFIG"
+    mkdir -p $O
+    cp "$CUSTOM_CONFIG" "$O/.config"
+else
+    make O=$O ARCH=arm64 $TARGET_DEFCONFIG
+fi
+
+# ================
+# Handle menuconfig
+# ================
+if [[ "$ACTION" == "menuconfig" ]]; then
+    section "Opening menuconfig"
+    make O=$O ARCH=arm64 menuconfig
+    exit 0
+fi
 
 section "Kernel build"
 kernel_make
@@ -221,4 +177,5 @@ done
 
 section "Generating modules.load files"
 generate_modules_load
-    echo -e "debugcc-kalama.ko\nsched-walt.ko" >> $OUT_DIR/modules.load
+echo -e "debugcc-kalama.ko\nsched-walt.ko" >> $OUT_DIR/modules.load
+
