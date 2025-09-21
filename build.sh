@@ -127,11 +127,6 @@ function generate_modules_load() {
     for ext_mod in $ext_modules; do
         generate_module_deps $ext_mod $OUT_DIR/modules.load
     done
-    
-    
-    ```bash
-```
-
 
     sed -i '/zram.ko/d; /zsmalloc.ko/d' $OUT_DIR/modules.load
 
