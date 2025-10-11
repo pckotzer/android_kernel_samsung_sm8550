@@ -1591,6 +1591,10 @@ retry:
 	} else if (rc)
 		goto out_unlock;
 	rc = sidtab_context_to_sid(sidtab, &context, sid);
+
+	if (context.str == str_onstack)
+		context.str = NULL;
+
 	if (rc == -ESTALE) {
 		rcu_read_unlock();
 		if (context.str) {
