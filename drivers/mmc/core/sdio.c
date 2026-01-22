@@ -7,7 +7,6 @@
 
 #include <linux/err.h>
 #include <linux/pm_runtime.h>
-#include <linux/sysfs.h>
 
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
@@ -43,9 +42,9 @@ static ssize_t info##num##_show(struct device *dev, struct device_attribute *att
 												\
 	if (num > card->num_info)								\
 		return -ENODATA;								\
-	if (!card->info[num - 1][0])								\
+	if (!card->info[num-1][0])								\
 		return 0;									\
-	return sysfs_emit(buf, "%s\n", card->info[num - 1]);					\
+	return sprintf(buf, "%s\n", card->info[num-1]);						\
 }												\
 static DEVICE_ATTR_RO(info##num)
 
@@ -445,8 +444,6 @@ static unsigned mmc_sdio_get_max_clock(struct mmc_card *card)
 
 	if (card->type == MMC_TYPE_SD_COMBO)
 		max_dtr = min(max_dtr, mmc_sd_get_max_clock(card));
-
-	max_dtr = min_not_zero(max_dtr, card->quirk_max_rate);
 
 	return max_dtr;
 }
@@ -932,11 +929,7 @@ static void mmc_sdio_remove(struct mmc_host *host)
  */
 static int mmc_sdio_alive(struct mmc_host *host)
 {
-	if (!mmc_host_is_spi(host))
-		return mmc_select_card(host->card);
-	else
-		return mmc_io_rw_direct(host->card, 0, 0, SDIO_CCCR_CCCR, 0,
-					NULL);
+	return mmc_select_card(host->card);
 }
 
 /*

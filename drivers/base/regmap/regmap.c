@@ -473,11 +473,9 @@ static void regmap_lock_hwlock_irq(void *__map)
 static void regmap_lock_hwlock_irqsave(void *__map)
 {
 	struct regmap *map = __map;
-	unsigned long flags = 0;
 
 	hwspin_lock_timeout_irqsave(map->hwlock, UINT_MAX,
-				    &flags);
-	map->spinlock_flags = flags;
+				    &map->spinlock_flags);
 }
 
 static void regmap_unlock_hwlock(void *__map)
@@ -1251,8 +1249,6 @@ err_name:
 err_map:
 	kfree(map);
 err:
-	if (bus && bus->free_on_exit)
-		kfree(bus);
 	return ERR_PTR(ret);
 }
 EXPORT_SYMBOL_GPL(__regmap_init);

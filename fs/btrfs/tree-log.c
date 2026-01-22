@@ -313,7 +313,8 @@ struct walk_control {
 
 	/*
 	 * Ignore any items from the inode currently being processed. Needs
-	 * to be set every time we find a BTRFS_INODE_ITEM_KEY.
+	 * to be set every time we find a BTRFS_INODE_ITEM_KEY and we are in
+	 * the LOG_WALK_REPLAY_INODES stage.
 	 */
 	bool ignore_cur_inode;
 
@@ -1065,9 +1066,7 @@ again:
 	search_key.type = BTRFS_INODE_REF_KEY;
 	search_key.offset = parent_objectid;
 	ret = btrfs_search_slot(NULL, root, &search_key, path, 0, 0);
-	if (ret < 0) {
-		return ret;
-	} else if (ret == 0) {
+	if (ret == 0) {
 		struct btrfs_inode_ref *victim_ref;
 		unsigned long ptr;
 		unsigned long ptr_end;
@@ -2580,30 +2579,23 @@ static int replay_one_buffer(struct btrfs_root *log, struct extent_buffer *eb,
 
 	nritems = btrfs_header_nritems(eb);
 	for (i = 0; i < nritems; i++) {
-		struct btrfs_inode_item *inode_item;
-
 		btrfs_item_key_to_cpu(eb, &key, i);
 
-		if (key.type == BTRFS_INODE_ITEM_KEY) {
-			inode_item = btrfs_item_ptr(eb, i, struct btrfs_inode_item);
+		/* inode keys are done during the first stage */
+		if (key.type == BTRFS_INODE_ITEM_KEY &&
+		    wc->stage == LOG_WALK_REPLAY_INODES) {
+			struct btrfs_inode_item *inode_item;
+			u32 mode;
+
+			inode_item = btrfs_item_ptr(eb, i,
+					    struct btrfs_inode_item);
 			/*
-			 * An inode with no links is either:
-			 *
-			 * 1) A tmpfile (O_TMPFILE) that got fsync'ed and never
-			 *    got linked before the fsync, skip it, as replaying
-			 *    it is pointless since it would be deleted later.
-			 *    We skip logging tmpfiles, but it's always possible
-			 *    we are replaying a log created with a kernel that
-			 *    used to log tmpfiles;
-			 *
-			 * 2) A non-tmpfile which got its last link deleted
-			 *    while holding an open fd on it and later got
-			 *    fsynced through that fd. We always log the
-			 *    parent inodes when inode->last_unlink_trans is
-			 *    set to the current transaction, so ignore all the
-			 *    inode items for this inode. We will delete the
-			 *    inode when processing the parent directory with
-			 *    replay_dir_deletes().
+			 * If we have a tmpfile (O_TMPFILE) that got fsync'ed
+			 * and never got linked before the fsync, skip it, as
+			 * replaying it is pointless since it would be deleted
+			 * later. We skip logging tmpfiles, but it's always
+			 * possible we are replaying a log created with a kernel
+			 * that used to log tmpfiles.
 			 */
 			if (btrfs_inode_nlink(eb, inode_item) == 0) {
 				wc->ignore_cur_inode = true;
@@ -2611,14 +2603,8 @@ static int replay_one_buffer(struct btrfs_root *log, struct extent_buffer *eb,
 			} else {
 				wc->ignore_cur_inode = false;
 			}
-		}
-
-		/* Inode keys are done during the first stage. */
-		if (key.type == BTRFS_INODE_ITEM_KEY &&
-		    wc->stage == LOG_WALK_REPLAY_INODES) {
-			u32 mode;
-
-			ret = replay_xattr_deletes(wc->trans, root, log, path, key.objectid);
+			ret = replay_xattr_deletes(wc->trans, root, log,
+						   path, key.objectid);
 			if (ret)
 				break;
 			mode = btrfs_inode_mode(eb, inode_item);
@@ -3955,21 +3941,6 @@ static int drop_objectid_items(struct btrfs_trans_handle *trans,
 	return ret;
 }
 
-static int truncate_inode_items(struct btrfs_trans_handle *trans,
-				struct btrfs_root *log_root,
-				struct btrfs_inode *inode,
-				u64 new_size, u32 min_type)
-{
-	int ret;
-
-	do {
-		ret = btrfs_truncate_inode_items(trans, log_root, inode,
-						 new_size, min_type, NULL);
-	} while (ret == -EAGAIN);
-
-	return ret;
-}
-
 static void fill_inode_item(struct btrfs_trans_handle *trans,
 			    struct extent_buffer *leaf,
 			    struct btrfs_inode_item *item,
@@ -4014,11 +3985,6 @@ static void fill_inode_item(struct btrfs_trans_handle *trans,
 				     inode->i_ctime.tv_sec);
 	btrfs_set_token_timespec_nsec(&token, &item->ctime,
 				      inode->i_ctime.tv_nsec);
-
-	btrfs_set_token_timespec_sec(&token, &item->otime,
-				     BTRFS_I(inode)->i_otime.tv_sec);
-	btrfs_set_token_timespec_nsec(&token, &item->otime,
-				      BTRFS_I(inode)->i_otime.tv_nsec);
 
 	/*
 	 * We do not need to set the nbytes field, in fact during a fast fsync
@@ -4558,23 +4524,22 @@ static int btrfs_log_prealloc_extents(struct btrfs_trans_handle *trans,
 			path->slots[0]++;
 			continue;
 		}
-		/*
-		 * Avoid overlapping items in the log tree. The first time we
-		 * get here, get rid of everything from a past fsync. After
-		 * that, if the current extent starts before the end of the last
-		 * extent we copied, truncate the last one. This can happen if
-		 * an ordered extent completion modifies the subvolume tree
-		 * while btrfs_next_leaf() has the tree unlocked.
-		 */
-		if (!dropped_extents || key.offset < truncate_offset) {
-			ret = truncate_inode_items(trans, root->log_root, inode,
-						   min(key.offset, truncate_offset),
-						   BTRFS_EXTENT_DATA_KEY);
+		if (!dropped_extents) {
+			/*
+			 * Avoid logging extent items logged in past fsync calls
+			 * and leading to duplicate keys in the log tree.
+			 */
+			do {
+				ret = btrfs_truncate_inode_items(trans,
+							 root->log_root,
+							 inode, truncate_offset,
+							 BTRFS_EXTENT_DATA_KEY,
+							 NULL);
+			} while (ret == -EAGAIN);
 			if (ret)
 				goto out;
 			dropped_extents = true;
 		}
-		truncate_offset = btrfs_file_extent_end(path);
 		if (ins_nr == 0)
 			start_slot = slot;
 		ins_nr++;
@@ -5547,7 +5512,12 @@ static int btrfs_log_inode(struct btrfs_trans_handle *trans,
 					  &inode->runtime_flags);
 				clear_bit(BTRFS_INODE_COPY_EVERYTHING,
 					  &inode->runtime_flags);
-				ret = truncate_inode_items(trans, log, inode, 0, 0);
+				while(1) {
+					ret = btrfs_truncate_inode_items(trans,
+						log, inode, 0, 0, NULL);
+					if (ret != -EAGAIN)
+						break;
+				}
 			}
 		} else if (test_and_clear_bit(BTRFS_INODE_COPY_EVERYTHING,
 					      &inode->runtime_flags) ||
@@ -6524,6 +6494,7 @@ next:
 
 	log_root_tree->log_root = NULL;
 	clear_bit(BTRFS_FS_LOG_RECOVERING, &fs_info->flags);
+	btrfs_put_root(log_root_tree);
 
 	return 0;
 error:

@@ -136,6 +136,7 @@
 
 		gpio = <&tlmm 88 0>;
 		enable-active-high;
+		regulator-boot-on;
 	};
 };
 
@@ -226,7 +227,6 @@
 			regulator-min-microvolt = <1800000>;
 			regulator-max-microvolt = <1800000>;
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
-			regulator-boot-on;
 		};
 
 		vreg_l14a_1p88: ldo14 {

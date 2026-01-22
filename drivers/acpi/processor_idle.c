@@ -265,10 +265,6 @@ static int acpi_processor_get_power_info_fadt(struct acpi_processor *pr)
 			 ACPI_CX_DESC_LEN, "ACPI P_LVL3 IOPORT 0x%x",
 			 pr->power.states[ACPI_STATE_C3].address);
 
-	if (!pr->power.states[ACPI_STATE_C2].address &&
-	    !pr->power.states[ACPI_STATE_C3].address)
-		return -ENODEV;
-
 	return 0;
 }
 
@@ -1125,9 +1121,7 @@ static int acpi_processor_get_lpi_info(struct acpi_processor *pr)
 
 	status = acpi_get_parent(handle, &pr_ahandle);
 	while (ACPI_SUCCESS(status)) {
-		if (acpi_bus_get_device(pr_ahandle, &d))
-			break;
-
+		acpi_bus_get_device(pr_ahandle, &d);
 		handle = pr_ahandle;
 
 		if (strcmp(acpi_device_hid(d), ACPI_PROCESSOR_CONTAINER_HID))
@@ -1403,9 +1397,6 @@ int acpi_processor_power_init(struct acpi_processor *pr)
 		if (retval) {
 			if (acpi_processor_registered == 0)
 				cpuidle_unregister_driver(&acpi_idle_driver);
-
-			per_cpu(acpi_cpuidle_device, pr->id) = NULL;
-			kfree(dev);
 			return retval;
 		}
 		acpi_processor_registered++;

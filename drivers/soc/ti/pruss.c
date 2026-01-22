@@ -106,10 +106,12 @@ static int pruss_clk_mux_setup(struct pruss *pruss, struct clk *clk_mux,
 
 	ret = devm_add_action_or_reset(dev, pruss_of_free_clk_provider,
 				       clk_mux_np);
-	if (ret)
+	if (ret) {
 		dev_err(dev, "failed to add clkmux free action %d", ret);
+		goto put_clk_mux_np;
+	}
 
-	return ret;
+	return 0;
 
 put_clk_mux_np:
 	of_node_put(clk_mux_np);
@@ -268,7 +270,7 @@ static int pruss_probe(struct platform_device *pdev)
 		pruss->mem_regions[i].pa = res.start;
 		pruss->mem_regions[i].size = resource_size(&res);
 
-		dev_dbg(dev, "memory %8s: pa %pa size 0x%zx va %p\n",
+		dev_dbg(dev, "memory %8s: pa %pa size 0x%zx va %pK\n",
 			mem_names[i], &pruss->mem_regions[i].pa,
 			pruss->mem_regions[i].size, pruss->mem_regions[i].va);
 	}

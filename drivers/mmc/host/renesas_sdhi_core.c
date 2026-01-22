@@ -193,11 +193,7 @@ static void renesas_sdhi_set_clock(struct tmio_mmc_host *host,
 			clk &= ~0xff;
 	}
 
-	clock = clk & CLK_CTL_DIV_MASK;
-	if (clock != 0xff)
-		host->mmc->actual_clock /= (1 << (ffs(clock) + 1));
-
-	sd_ctrl_write16(host, CTL_SD_CARD_CLK_CTL, clock);
+	sd_ctrl_write16(host, CTL_SD_CARD_CLK_CTL, clk & CLK_CTL_DIV_MASK);
 	if (!(host->pdata->flags & TMIO_MMC_MIN_RCAR2))
 		usleep_range(10000, 11000);
 
@@ -1082,26 +1078,26 @@ int renesas_sdhi_probe(struct platform_device *pdev,
 	num_irqs = platform_irq_count(pdev);
 	if (num_irqs < 0) {
 		ret = num_irqs;
-		goto edisclk;
+		goto eirq;
 	}
 
 	/* There must be at least one IRQ source */
 	if (!num_irqs) {
 		ret = -ENXIO;
-		goto edisclk;
+		goto eirq;
 	}
 
 	for (i = 0; i < num_irqs; i++) {
 		irq = platform_get_irq(pdev, i);
 		if (irq < 0) {
 			ret = irq;
-			goto edisclk;
+			goto eirq;
 		}
 
 		ret = devm_request_irq(&pdev->dev, irq, tmio_mmc_irq, 0,
 				       dev_name(&pdev->dev), host);
 		if (ret)
-			goto edisclk;
+			goto eirq;
 	}
 
 	ret = tmio_mmc_host_probe(host);
@@ -1113,6 +1109,8 @@ int renesas_sdhi_probe(struct platform_device *pdev,
 
 	return ret;
 
+eirq:
+	tmio_mmc_host_remove(host);
 edisclk:
 	renesas_sdhi_clk_disable(host);
 efree:

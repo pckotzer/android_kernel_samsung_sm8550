@@ -883,12 +883,11 @@ static void pci_set_bus_msi_domain(struct pci_bus *bus)
 static int pci_register_host_bridge(struct pci_host_bridge *bridge)
 {
 	struct device *parent = bridge->dev.parent;
-	struct resource_entry *window, *next, *n;
+	struct resource_entry *window, *n;
 	struct pci_bus *bus, *b;
-	resource_size_t offset, next_offset;
+	resource_size_t offset;
 	LIST_HEAD(resources);
-	struct resource *res, *next_res;
-	bool bus_registered = false;
+	struct resource *res;
 	char addr[64], *fmt;
 	const char *name;
 	int err;
@@ -909,10 +908,6 @@ static int pci_register_host_bridge(struct pci_host_bridge *bridge)
 		bus->domain_nr = pci_bus_find_domain_nr(bus, parent);
 	else
 		bus->domain_nr = bridge->domain_nr;
-	if (bus->domain_nr < 0) {
-		err = bus->domain_nr;
-		goto free;
-	}
 #endif
 
 	b = pci_find_bus(pci_domain_nr(bus), bridge->busnr);
@@ -931,9 +926,10 @@ static int pci_register_host_bridge(struct pci_host_bridge *bridge)
 		goto free;
 
 	err = device_add(&bridge->dev);
-	if (err)
+	if (err) {
+		put_device(&bridge->dev);
 		goto free;
-
+	}
 	bus->bridge = get_device(&bridge->dev);
 	device_enable_async_suspend(bus->bridge);
 	pci_set_bus_of_node(bus);
@@ -952,7 +948,6 @@ static int pci_register_host_bridge(struct pci_host_bridge *bridge)
 	name = dev_name(&bus->dev);
 
 	err = device_register(&bus->dev);
-	bus_registered = true;
 	if (err)
 		goto unregister;
 
@@ -975,36 +970,11 @@ static int pci_register_host_bridge(struct pci_host_bridge *bridge)
 	if (nr_node_ids > 1 && pcibus_to_node(bus) == NUMA_NO_NODE)
 		dev_warn(&bus->dev, "Unknown NUMA node; performance will be reduced\n");
 
-	/* Coalesce contiguous windows */
-	resource_list_for_each_entry_safe(window, n, &resources) {
-		if (list_is_last(&window->node, &resources))
-			break;
-
-		next = list_next_entry(window, node);
-		offset = window->offset;
-		res = window->res;
-		next_offset = next->offset;
-		next_res = next->res;
-
-		if (res->flags != next_res->flags || offset != next_offset)
-			continue;
-
-		if (res->end + 1 == next_res->start) {
-			next_res->start = res->start;
-			res->flags = res->start = res->end = 0;
-		}
-	}
-
 	/* Add initial resources to the bus */
 	resource_list_for_each_entry_safe(window, n, &resources) {
+		list_move_tail(&window->node, &bridge->windows);
 		offset = window->offset;
 		res = window->res;
-		if (!res->flags && !res->start && !res->end) {
-			release_resource(res);
-			continue;
-		}
-
-		list_move_tail(&window->node, &bridge->windows);
 
 		if (res->flags & IORESOURCE_BUS)
 			pci_bus_insert_busn_res(bus, bus->number, res->end);
@@ -1035,15 +1005,9 @@ static int pci_register_host_bridge(struct pci_host_bridge *bridge)
 unregister:
 	put_device(&bridge->dev);
 	device_del(&bridge->dev);
-free:
-#ifdef CONFIG_PCI_DOMAINS_GENERIC
-	pci_bus_release_domain_nr(bus, parent);
-#endif
-	if (bus_registered)
-		put_device(&bus->dev);
-	else
-		kfree(bus);
 
+free:
+	kfree(bus);
 	return err;
 }
 
@@ -1152,10 +1116,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
 add_dev:
 	pci_set_bus_msi_domain(child);
 	ret = device_register(&child->dev);
-	if (WARN_ON(ret < 0)) {
-		put_device(&child->dev);
-		return NULL;
-	}
+	WARN_ON(ret < 0);
 
 	pcibios_add_bus(child);
 
@@ -2103,8 +2064,7 @@ int pci_configure_extended_tags(struct pci_dev *dev, void *ign)
 	u16 ctl;
 	int ret;
 
-	/* PCI_EXP_DEVCTL_EXT_TAG is RsvdP in VFs */
-	if (!pci_is_pcie(dev) || dev->is_virtfn)
+	if (!pci_is_pcie(dev))
 		return 0;
 
 	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &cap);
@@ -2229,37 +2189,6 @@ static void pci_configure_serr(struct pci_dev *dev)
 	}
 }
 
-static void pci_configure_rcb(struct pci_dev *dev)
-{
-	struct pci_dev *rp;
-	u16 rp_lnkctl;
-
-	/*
-	 * Per PCIe r7.0, sec 7.5.3.7, RCB is only meaningful in Root Ports
-	 * (where it is read-only), Endpoints, and Bridges.  It may only be
-	 * set for Endpoints and Bridges if it is set in the Root Port. For
-	 * Endpoints, it is 'RsvdP' for Virtual Functions.
-	 */
-	if (!pci_is_pcie(dev) ||
-	    pci_pcie_type(dev) == PCI_EXP_TYPE_ROOT_PORT ||
-	    pci_pcie_type(dev) == PCI_EXP_TYPE_UPSTREAM ||
-	    pci_pcie_type(dev) == PCI_EXP_TYPE_DOWNSTREAM ||
-	    pci_pcie_type(dev) == PCI_EXP_TYPE_RC_EC ||
-	    dev->is_virtfn)
-		return;
-
-	/* Root Port often not visible to virtualized guests */
-	rp = pcie_find_root_port(dev);
-	if (!rp)
-		return;
-
-	pcie_capability_read_word(rp, PCI_EXP_LNKCTL, &rp_lnkctl);
-	pcie_capability_clear_and_set_word(dev, PCI_EXP_LNKCTL,
-					   PCI_EXP_LNKCTL_RCB,
-					   (rp_lnkctl & PCI_EXP_LNKCTL_RCB) ?
-					   PCI_EXP_LNKCTL_RCB : 0);
-}
-
 static void pci_configure_device(struct pci_dev *dev)
 {
 	pci_configure_mps(dev);
@@ -2269,7 +2198,6 @@ static void pci_configure_device(struct pci_dev *dev)
 	pci_configure_aspm_l1ss(dev);
 	pci_configure_eetlp_prefix(dev);
 	pci_configure_serr(dev);
-	pci_configure_rcb(dev);
 
 	pci_acpi_program_hp_params(dev);
 }

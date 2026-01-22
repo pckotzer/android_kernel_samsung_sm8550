@@ -5,7 +5,6 @@
  * Copyright 2006-2007	Jiri Benc <jbenc@suse.cz>
  * Copyright 2008-2010	Johannes Berg <johannes@sipsolutions.net>
  * Copyright 2013-2014  Intel Mobile Communications GmbH
- * Copyright 2021-2023  Intel Corporation
  */
 
 #include <linux/export.h>
@@ -717,8 +716,8 @@ static void ieee80211_report_used_skb(struct ieee80211_local *local,
 					if (qskb) {
 						skb_queue_tail(&sdata->status_queue,
 							       qskb);
-						wiphy_work_queue(local->hw.wiphy,
-								 &sdata->work);
+						ieee80211_queue_work(&local->hw,
+								     &sdata->work);
 					}
 				}
 			} else {

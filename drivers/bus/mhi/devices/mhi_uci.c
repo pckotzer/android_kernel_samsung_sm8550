@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.*/
-/* Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. */
 
 #include <linux/cdev.h>
 #include <linux/device.h>
@@ -174,7 +173,7 @@ static int mhi_uci_release(struct inode *inode, struct file *file)
 	mutex_lock(&mhi_uci_drv.lock);
 	mutex_lock(&uci_dev->mutex);
 	uci_dev->ref_count--;
-	if (uci_dev->ref_count == 1) {
+	if (!uci_dev->ref_count) {
 		struct uci_buf *itr, *tmp;
 		struct uci_chan *uci_chan;
 
@@ -194,6 +193,17 @@ static int mhi_uci_release(struct inode *inode, struct file *file)
 
 		uci_chan->cur_buf = NULL;
 
+		if (!uci_dev->enabled) {
+			MSG_LOG("Node is deleted, freeing dev node\n");
+			mutex_unlock(&uci_dev->mutex);
+			mutex_destroy(&uci_dev->mutex);
+			mutex_destroy(&uci_dev->dl_chan.chan_lock);
+			mutex_destroy(&uci_dev->ul_chan.chan_lock);
+			clear_bit(MINOR(uci_dev->devt), uci_minors);
+			kfree(uci_dev);
+			mutex_unlock(&mhi_uci_drv.lock);
+			return 0;
+		}
 	}
 
 	MSG_LOG("exit: ref_count:%d\n", uci_dev->ref_count);
@@ -474,13 +484,13 @@ static int mhi_uci_open(struct inode *inode, struct file *filp)
 		goto error_exit;
 
 	mutex_lock(&uci_dev->mutex);
-
 	if (!uci_dev->enabled) {
 		MSG_ERR("Node exist, but not in active state!\n");
 		goto error_open_chan;
 	}
 
 	uci_dev->ref_count++;
+
 	MSG_LOG("Node open, ref counts %u\n", uci_dev->ref_count);
 
 	/* ref_count will be incremented at open and probe */
@@ -504,8 +514,7 @@ static int mhi_uci_open(struct inode *inode, struct file *filp)
 
 	return 0;
 
-error_rx_queue:
-	uci_dev->ref_count--;
+ error_rx_queue:
 	dl_chan = &uci_dev->dl_chan;
 	mhi_unprepare_from_transfer(uci_dev->mhi_dev);
 	list_for_each_entry_safe(buf_itr, tmp, &dl_chan->pending, node) {
@@ -513,7 +522,7 @@ error_rx_queue:
 		kfree(buf_itr->data);
 	}
 
-error_open_chan:
+ error_open_chan:
 	mutex_unlock(&uci_dev->mutex);
 
 error_exit:

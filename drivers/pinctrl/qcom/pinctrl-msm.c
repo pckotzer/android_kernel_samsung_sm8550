@@ -257,7 +257,7 @@ static int msm_pinmux_set_mux(struct pinctrl_dev *pctldev,
 	 */
 	if (d && i != gpio_func &&
 	    !test_and_set_bit(d->hwirq, pctrl->disabled_for_mux))
-		disable_irq_nosync(irq);
+		disable_irq(irq);
 
 	raw_spin_lock_irqsave(&pctrl->lock, flags);
 
@@ -1208,25 +1208,6 @@ static void msm_dirconn_cfg_reg(struct irq_data *d, u32 offset)
 	raw_spin_unlock_irqrestore(&pctrl->lock, flags);
 }
 
-static void msm_gpio_irq_init_valid_mask(struct gpio_chip *gc,
-					 unsigned long *valid_mask,
-					 unsigned int ngpios)
-{
-	struct msm_pinctrl *pctrl = gpiochip_get_data(gc);
-	const struct msm_pingroup *g;
-	int i;
-
-	bitmap_fill(valid_mask, ngpios);
-
-	for (i = 0; i < ngpios; i++) {
-		g = &pctrl->soc->groups[i];
-
-		if (g->intr_detection_width != 1 &&
-		    g->intr_detection_width != 2)
-			clear_bit(i, valid_mask);
-	}
-}
-
 static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 {
 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
@@ -1236,7 +1217,8 @@ static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 	u32 intr_target_mask = GENMASK(2, 0);
 	unsigned long flags;
 	u32 offset = 0;
-	u32 val, oldval;
+	bool was_enabled;
+	u32 val;
 
 	if (msm_gpio_needs_dual_edge_parent_workaround(d, type)) {
 		set_bit(d->hwirq, pctrl->dual_edge_irqs);
@@ -1306,7 +1288,8 @@ static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 	 * internal circuitry of TLMM, toggling the RAW_STATUS
 	 * could cause the INTR_STATUS to be set for EDGE interrupts.
 	 */
-	val = oldval = msm_readl_intr_cfg(pctrl, g);
+	val = msm_readl_intr_cfg(pctrl, g);
+	was_enabled = val & BIT(g->intr_raw_status_bit);
 	val |= BIT(g->intr_raw_status_bit);
 	if (g->intr_detection_width == 2) {
 		val &= ~(3 << g->intr_detection_bit);
@@ -1359,11 +1342,9 @@ static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int type)
 	/*
 	 * The first time we set RAW_STATUS_EN it could trigger an interrupt.
 	 * Clear the interrupt.  This is safe because we have
-	 * IRQCHIP_SET_TYPE_MASKED. When changing the interrupt type, we could
-	 * also still have a non-matching interrupt latched, so clear whenever
-	 * making changes to the interrupt configuration.
+	 * IRQCHIP_SET_TYPE_MASKED.
 	 */
-	if (val != oldval)
+	if (!was_enabled)
 		msm_ack_intr_status(pctrl, g);
 
 	if (test_bit(d->hwirq, pctrl->dual_edge_irqs))
@@ -1658,7 +1639,6 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
 	girq->default_type = IRQ_TYPE_NONE;
 	girq->handler = handle_bad_irq;
 	girq->parents[0] = pctrl->irq;
-	girq->init_valid_mask = msm_gpio_irq_init_valid_mask;
 
 	ret = gpiochip_add_data(&pctrl->chip, pctrl);
 	if (ret) {

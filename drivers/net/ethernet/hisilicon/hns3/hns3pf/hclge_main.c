@@ -151,11 +151,10 @@ static const u32 tqp_intr_reg_addr_list[] = {HCLGE_TQP_INTR_CTRL_REG,
 					     HCLGE_TQP_INTR_RL_REG};
 
 static const char hns3_nic_test_strs[][ETH_GSTRING_LEN] = {
-	"External Loopback test",
-	"App      Loopback test",
-	"Serdes   serial Loopback test",
-	"Serdes   parallel Loopback test",
-	"Phy      Loopback test"
+	"App    Loopback test",
+	"Serdes serial Loopback test",
+	"Serdes parallel Loopback test",
+	"Phy    Loopback test"
 };
 
 static const struct hclge_comm_stats_str g_mac_stats_string[] = {
@@ -755,8 +754,7 @@ static int hclge_get_sset_count(struct hnae3_handle *handle, int stringset)
 #define HCLGE_LOOPBACK_TEST_FLAGS (HNAE3_SUPPORT_APP_LOOPBACK | \
 		HNAE3_SUPPORT_PHY_LOOPBACK | \
 		HNAE3_SUPPORT_SERDES_SERIAL_LOOPBACK | \
-		HNAE3_SUPPORT_SERDES_PARALLEL_LOOPBACK | \
-		HNAE3_SUPPORT_EXTERNAL_LOOPBACK)
+		HNAE3_SUPPORT_SERDES_PARALLEL_LOOPBACK)
 
 	struct hclge_vport *vport = hclge_get_vport(handle);
 	struct hclge_dev *hdev = vport->back;
@@ -778,12 +776,9 @@ static int hclge_get_sset_count(struct hnae3_handle *handle, int stringset)
 			handle->flags |= HNAE3_SUPPORT_APP_LOOPBACK;
 		}
 
-		count += 1;
+		count += 2;
 		handle->flags |= HNAE3_SUPPORT_SERDES_SERIAL_LOOPBACK;
-		count += 1;
 		handle->flags |= HNAE3_SUPPORT_SERDES_PARALLEL_LOOPBACK;
-		count += 1;
-		handle->flags |= HNAE3_SUPPORT_EXTERNAL_LOOPBACK;
 
 		if ((hdev->hw.mac.phydev && hdev->hw.mac.phydev->drv &&
 		     hdev->hw.mac.phydev->drv->set_loopback) ||
@@ -811,11 +806,6 @@ static void hclge_get_strings(struct hnae3_handle *handle, u32 stringset,
 					   size, p);
 		p = hclge_tqps_get_strings(handle, p);
 	} else if (stringset == ETH_SS_TEST) {
-		if (handle->flags & HNAE3_SUPPORT_EXTERNAL_LOOPBACK) {
-			memcpy(p, hns3_nic_test_strs[HNAE3_LOOP_EXTERNAL],
-			       ETH_GSTRING_LEN);
-			p += ETH_GSTRING_LEN;
-		}
 		if (handle->flags & HNAE3_SUPPORT_APP_LOOPBACK) {
 			memcpy(p, hns3_nic_test_strs[HNAE3_LOOP_APP],
 			       ETH_GSTRING_LEN);
@@ -5845,20 +5835,18 @@ static int hclge_fd_ad_config(struct hclge_dev *hdev, u8 stage, int loc,
 		hnae3_set_field(ad_data, HCLGE_FD_AD_TC_SIZE_M,
 				HCLGE_FD_AD_TC_SIZE_S, (u32)action->tc_size);
 	}
-	hnae3_set_bit(ad_data, HCLGE_FD_AD_QID_H_B,
-		      action->queue_id >= HCLGE_TQP_MAX_SIZE_DEV_V2 ? 1 : 0);
 	ad_data <<= 32;
 	hnae3_set_bit(ad_data, HCLGE_FD_AD_DROP_B, action->drop_packet);
 	hnae3_set_bit(ad_data, HCLGE_FD_AD_DIRECT_QID_B,
 		      action->forward_to_direct_queue);
-	hnae3_set_field(ad_data, HCLGE_FD_AD_QID_L_M, HCLGE_FD_AD_QID_L_S,
+	hnae3_set_field(ad_data, HCLGE_FD_AD_QID_M, HCLGE_FD_AD_QID_S,
 			action->queue_id);
 	hnae3_set_bit(ad_data, HCLGE_FD_AD_USE_COUNTER_B, action->use_counter);
 	hnae3_set_field(ad_data, HCLGE_FD_AD_COUNTER_NUM_M,
 			HCLGE_FD_AD_COUNTER_NUM_S, action->counter_id);
 	hnae3_set_bit(ad_data, HCLGE_FD_AD_NXT_STEP_B, action->use_next_stage);
 	hnae3_set_field(ad_data, HCLGE_FD_AD_NXT_KEY_M, HCLGE_FD_AD_NXT_KEY_S,
-			action->next_input_key);
+			action->counter_id);
 
 	req->ad_data = cpu_to_le64(ad_data);
 	ret = hclge_cmd_send(&hdev->hw, &desc, 1);
@@ -6694,7 +6682,7 @@ static int hclge_fd_parse_ring_cookie(struct hclge_dev *hdev, u64 ring_cookie,
 		if (vf > hdev->num_req_vfs) {
 			dev_err(&hdev->pdev->dev,
 				"Error: vf id (%u) should be less than %u\n",
-				vf - 1U, hdev->num_req_vfs);
+				vf - 1, hdev->num_req_vfs);
 			return -EINVAL;
 		}
 
@@ -6704,7 +6692,7 @@ static int hclge_fd_parse_ring_cookie(struct hclge_dev *hdev, u64 ring_cookie,
 		if (ring >= tqps) {
 			dev_err(&hdev->pdev->dev,
 				"Error: queue id (%u) > max tqp num (%u)\n",
-				ring, tqps - 1U);
+				ring, tqps - 1);
 			return -EINVAL;
 		}
 
@@ -8072,7 +8060,7 @@ static int hclge_set_loopback(struct hnae3_handle *handle,
 {
 	struct hclge_vport *vport = hclge_get_vport(handle);
 	struct hclge_dev *hdev = vport->back;
-	int ret = 0;
+	int ret;
 
 	/* Loopback can be enabled in three places: SSU, MAC, and serdes. By
 	 * default, SSU loopback is enabled, so if the SMAC and the DMAC are
@@ -8098,8 +8086,6 @@ static int hclge_set_loopback(struct hnae3_handle *handle,
 		break;
 	case HNAE3_LOOP_PHY:
 		ret = hclge_set_phy_loopback(hdev, en);
-		break;
-	case HNAE3_LOOP_EXTERNAL:
 		break;
 	default:
 		ret = -ENOTSUPP;
@@ -9564,7 +9550,8 @@ static int hclge_mii_ioctl(struct hclge_dev *hdev, struct ifreq *ifr, int cmd)
 		/* this command reads phy id and register at the same time */
 		fallthrough;
 	case SIOCGMIIREG:
-		return hclge_read_phy_reg(hdev, data->reg_num, &data->val_out);
+		data->val_out = hclge_read_phy_reg(hdev, data->reg_num);
+		return 0;
 
 	case SIOCSMIIREG:
 		return hclge_write_phy_reg(hdev, data->reg_num, data->val_in);
@@ -9710,36 +9697,33 @@ static bool hclge_need_enable_vport_vlan_filter(struct hclge_vport *vport)
 	return false;
 }
 
-static int __hclge_enable_vport_vlan_filter(struct hclge_vport *vport,
-					    bool request_en)
-{
-	bool need_en;
-	int ret;
-
-	need_en = hclge_need_enable_vport_vlan_filter(vport);
-	if (need_en == vport->cur_vlan_fltr_en)
-		return 0;
-
-	ret = hclge_set_vport_vlan_filter(vport, need_en);
-	if (ret)
-		return ret;
-
-	vport->cur_vlan_fltr_en = need_en;
-
-	return 0;
-}
-
 int hclge_enable_vport_vlan_filter(struct hclge_vport *vport, bool request_en)
 {
 	struct hclge_dev *hdev = vport->back;
+	bool need_en;
 	int ret;
 
 	mutex_lock(&hdev->vport_lock);
+
 	vport->req_vlan_fltr_en = request_en;
-	ret = __hclge_enable_vport_vlan_filter(vport, request_en);
+
+	need_en = hclge_need_enable_vport_vlan_filter(vport);
+	if (need_en == vport->cur_vlan_fltr_en) {
+		mutex_unlock(&hdev->vport_lock);
+		return 0;
+	}
+
+	ret = hclge_set_vport_vlan_filter(vport, need_en);
+	if (ret) {
+		mutex_unlock(&hdev->vport_lock);
+		return ret;
+	}
+
+	vport->cur_vlan_fltr_en = need_en;
+
 	mutex_unlock(&hdev->vport_lock);
 
-	return ret;
+	return 0;
 }
 
 static int hclge_enable_vlan_filter(struct hnae3_handle *handle, bool enable)
@@ -10684,9 +10668,6 @@ int hclge_set_vlan_filter(struct hnae3_handle *handle, __be16 proto,
 	bool writen_to_tbl = false;
 	int ret = 0;
 
-	if (vlan_id >= VLAN_N_VID)
-		return -EINVAL;
-
 	/* When device is resetting or reset failed, firmware is unable to
 	 * handle mailbox. Just record the vlan id, and remove it after
 	 * reset finished.
@@ -10750,19 +10731,16 @@ static void hclge_sync_vlan_fltr_state(struct hclge_dev *hdev)
 					&vport->state))
 			continue;
 
-		mutex_lock(&hdev->vport_lock);
-		ret = __hclge_enable_vport_vlan_filter(vport,
-						       vport->req_vlan_fltr_en);
+		ret = hclge_enable_vport_vlan_filter(vport,
+						     vport->req_vlan_fltr_en);
 		if (ret) {
 			dev_err(&hdev->pdev->dev,
 				"failed to sync vlan filter state for vport%u, ret = %d\n",
 				vport->vport_id, ret);
 			set_bit(HCLGE_VPORT_STATE_VLAN_FLTR_CHANGE,
 				&vport->state);
-			mutex_unlock(&hdev->vport_lock);
 			return;
 		}
-		mutex_unlock(&hdev->vport_lock);
 	}
 }
 
@@ -13322,11 +13300,9 @@ static int hclge_init(void)
 
 static void hclge_exit(void)
 {
-	hnae3_acquire_unload_lock();
 	hnae3_unregister_ae_algo_prepare(&ae_algo);
 	hnae3_unregister_ae_algo(&ae_algo);
 	destroy_workqueue(hclge_wq);
-	hnae3_release_unload_lock();
 }
 module_init(hclge_init);
 module_exit(hclge_exit);

@@ -844,8 +844,10 @@ out:
 out_free:
 	if (free)
 		kfree(ipc.opt);
-	if (!err)
+	if (!err) {
+		icmp_out_count(sock_net(sk), user_icmph.type);
 		return len;
+	}
 	return err;
 
 do_confirm:

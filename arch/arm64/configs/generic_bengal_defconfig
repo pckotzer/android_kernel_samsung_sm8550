@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <<<<<<< HEAD:arch/arm64/configs/generic_bengal_defconfig
 CONFIG_UAPI_HEADER_TEST=y
 CONFIG_AUDIT=y
@@ -9,10 +8,6 @@ CONFIG_LOCALVERSION="-Sultan"
 CONFIG_IRQ_SBALANCE=y
 CONFIG_SBALANCE_EXCLUDE_CPUS="3,7,8"
 >>>>>>> 5959ddc720b1 (zuma_defconfig: Enable SBalance):arch/arm64/configs/zuma_defconfig
-=======
-CONFIG_UAPI_HEADER_TEST=y
-CONFIG_AUDIT=y
->>>>>>> lineage-23.2/lineage-23.2
 CONFIG_NO_HZ=y
 CONFIG_HIGH_RES_TIMERS=y
 CONFIG_BPF_SYSCALL=y

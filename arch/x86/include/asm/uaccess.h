@@ -16,10 +16,8 @@
  * Test whether a block of memory is a valid user space address.
  * Returns 0 if the range is valid, nonzero otherwise.
  */
-static inline bool __chk_range_not_ok(unsigned long addr, unsigned long size)
+static inline bool __chk_range_not_ok(unsigned long addr, unsigned long size, unsigned long limit)
 {
-	unsigned long limit = TASK_SIZE_MAX;
-
 	/*
 	 * If we have used "sizeof()" for the size,
 	 * we know it won't overflow the limit (but
@@ -37,10 +35,10 @@ static inline bool __chk_range_not_ok(unsigned long addr, unsigned long size)
 	return unlikely(addr > limit);
 }
 
-#define __access_ok(addr, size)						\
+#define __range_not_ok(addr, size, limit)				\
 ({									\
 	__chk_user_ptr(addr);						\
-	!__chk_range_not_ok((unsigned long __force)(addr), size);	\
+	__chk_range_not_ok((unsigned long __force)(addr), size, limit); \
 })
 
 #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
@@ -71,7 +69,7 @@ static inline bool pagefault_disabled(void);
 #define access_ok(addr, size)					\
 ({									\
 	WARN_ON_IN_IRQ();						\
-	likely(__access_ok(addr, size));				\
+	likely(!__range_not_ok(addr, size, TASK_SIZE_MAX));		\
 })
 
 extern int __get_user_1(void);

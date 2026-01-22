@@ -22,7 +22,7 @@
 #define pt_dump_seq_puts(m, fmt)	\
 ({					\
 	if (m)				\
-		seq_puts(m, fmt);	\
+		seq_printf(m, fmt);	\
 })
 
 /*

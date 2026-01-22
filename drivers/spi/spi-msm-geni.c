@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -522,18 +522,6 @@ static struct spi_master *get_spi_master(struct device *dev)
 	return spi;
 }
 
-static inline void spi_geni_clk_conf(struct spi_geni_master *mas,
-		int clk_div, int clk_idx)
-{
-	geni_write_reg((clk_idx & CLK_SEL_MSK), mas->base, SE_GENI_CLK_SEL);
-	geni_write_reg(((clk_div << CLK_DIV_SHFT) | SER_CLK_EN), mas->base, GENI_SER_M_CLK_CFG);
-
-	/*
-	 * Ensure Clk config completes before return.
-	 */
-	mb();
-}
-
 static int get_spi_clk_cfg(u32 speed_hz, struct spi_geni_master *mas,
 			int *clk_idx, int *clk_div)
 {
@@ -563,9 +551,6 @@ static int get_spi_clk_cfg(u32 speed_hz, struct spi_geni_master *mas,
 
 	dev_dbg(mas->dev, "%s: req %u resultant %lu sclk %lu, idx %d, div %d\n",
 		__func__, speed_hz, res_freq, sclk_freq, *clk_idx, *clk_div);
-
-	if (mas->cur_xfer_mode != GENI_GPI_DMA)
-		spi_geni_clk_conf(mas, *clk_div, *clk_idx);
 
 	ret = clk_set_rate(se->clk, sclk_freq);
 	if (ret) {
@@ -614,9 +599,11 @@ static int setup_fifo_params(struct spi_device *spi_slv,
 	u32 cpha = geni_read_reg(mas->base, SE_SPI_CPHA);
 	u32 demux_sel = 0;
 	u32 demux_output_inv = 0;
+	u32 clk_sel = 0;
+	u32 m_clk_cfg = 0;
 	int ret = 0;
-	int idx = 0;
-	int div = 0;
+	int idx;
+	int div;
 	struct spi_geni_qcom_ctrl_data *delay_params = NULL;
 	u32 spi_delay_params = 0;
 
@@ -653,32 +640,33 @@ static int setup_fifo_params(struct spi_device *spi_slv,
 	}
 
 	demux_sel = spi_slv->chip_select;
+	mas->cur_speed_hz = spi_slv->max_speed_hz;
 	mas->cur_word_len = spi_slv->bits_per_word;
 
-	if (mas->cur_speed_hz != spi_slv->max_speed_hz) {
-		ret = get_spi_clk_cfg(spi_slv->max_speed_hz, mas, &idx, &div);
-		if (ret) {
-			dev_err(mas->dev, "Err setting clks ret(%d) for %d\n",
-				ret, spi_slv->max_speed_hz);
-			goto setup_fifo_params_exit;
-		}
-
-		mas->cur_speed_hz = spi_slv->max_speed_hz;
+	ret = get_spi_clk_cfg(mas->cur_speed_hz, mas, &idx, &div);
+	if (ret) {
+		dev_err(mas->dev, "Err setting clks ret(%d) for %d\n",
+							ret, mas->cur_speed_hz);
+		goto setup_fifo_params_exit;
 	}
 
+	clk_sel |= (idx & CLK_SEL_MSK);
+	m_clk_cfg |= ((div << CLK_DIV_SHFT) | SER_CLK_EN);
 	spi_setup_word_len(mas, spi_slv->mode, spi_slv->bits_per_word);
 	geni_write_reg(loopback_cfg, mas->base, SE_SPI_LOOPBACK);
 	geni_write_reg(demux_sel, mas->base, SE_SPI_DEMUX_SEL);
 	geni_write_reg(cpha, mas->base, SE_SPI_CPHA);
 	geni_write_reg(cpol, mas->base, SE_SPI_CPOL);
 	geni_write_reg(demux_output_inv, mas->base, SE_SPI_DEMUX_OUTPUT_INV);
+	geni_write_reg(clk_sel, mas->base, SE_GENI_CLK_SEL);
+	geni_write_reg(m_clk_cfg, mas->base, GENI_SER_M_CLK_CFG);
 	geni_write_reg(spi_delay_params, mas->base, SE_SPI_DELAY_COUNTERS);
 	SPI_LOG_DBG(mas->ipc, false, mas->dev,
-		"%s:Loopback%d demux_sel0x%x demux_op_inv 0x%x\n",
-		__func__, loopback_cfg, demux_sel, demux_output_inv);
+		"%s:Loopback%d demux_sel0x%x demux_op_inv 0x%x clk_cfg 0x%x\n",
+		__func__, loopback_cfg, demux_sel, demux_output_inv, m_clk_cfg);
 	SPI_LOG_DBG(mas->ipc, false, mas->dev,
-		"%s:cpol %d cpha %d delay 0x%x\n", __func__,
-					cpol, cpha, spi_delay_params);
+		"%s:clk_sel 0x%x cpol %d cpha %d delay 0x%x\n", __func__,
+					clk_sel, cpol, cpha, spi_delay_params);
 	/* Ensure message level attributes are written before returning */
 	mb();
 setup_fifo_params_exit:
@@ -1424,6 +1412,7 @@ static int spi_geni_unprepare_message(struct spi_master *spi_mas,
 	struct spi_geni_master *mas = spi_master_get_devdata(spi_mas);
 	int count = 0;
 
+	mas->cur_speed_hz = 0;
 	mas->cur_word_len = 0;
 	if (mas->cur_xfer_mode == GENI_GPI_DMA)
 		spi_geni_unmap_buf(mas, spi_msg);
@@ -1791,16 +1780,24 @@ static int setup_fifo_xfer(struct spi_transfer *xfer,
 
 	/* Speed and bits per word can be overridden per transfer */
 	if (xfer->speed_hz != mas->cur_speed_hz) {
+		u32 clk_sel = 0;
+		u32 m_clk_cfg = 0;
 		int idx = 0;
 		int div = 0;
 
 		ret = get_spi_clk_cfg(xfer->speed_hz, mas, &idx, &div);
 		if (ret) {
 			dev_err(mas->dev, "%s:Err setting clks:%d\n",
-				__func__, ret);
+								__func__, ret);
 			return ret;
 		}
 		mas->cur_speed_hz = xfer->speed_hz;
+		clk_sel |= (idx & CLK_SEL_MSK);
+		m_clk_cfg |= ((div << CLK_DIV_SHFT) | SER_CLK_EN);
+		geni_write_reg(clk_sel, mas->base, SE_GENI_CLK_SEL);
+		geni_write_reg(m_clk_cfg, mas->base, GENI_SER_M_CLK_CFG);
+		SPI_LOG_DBG(mas->ipc, false, mas->dev,
+			    "%s: freq %d idx %d div %d\n", __func__, xfer->speed_hz, idx, div);
 	}
 
 	mas->tx_rem_bytes = 0;
@@ -3008,7 +3005,6 @@ static int spi_geni_suspend(struct device *dev)
 		if (!geni_mas->gsi_mode) {
 			geni_mas->setup = false;
 			geni_mas->slave_setup = false;
-			geni_mas->cur_speed_hz = 0;
 		}
 	}
 #endif

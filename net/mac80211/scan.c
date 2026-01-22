@@ -498,7 +498,7 @@ static void __ieee80211_scan_completed(struct ieee80211_hw *hw, bool aborted)
 	 */
 	list_for_each_entry_rcu(sdata, &local->interfaces, list) {
 		if (ieee80211_sdata_running(sdata))
-			wiphy_work_queue(sdata->local->hw.wiphy, &sdata->work);
+			ieee80211_queue_work(&sdata->local->hw, &sdata->work);
 	}
 
 	if (was_scanning)

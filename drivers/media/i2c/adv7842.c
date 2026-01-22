@@ -2690,7 +2690,6 @@ static int adv7842_cp_log_status(struct v4l2_subdev *sd)
 	/* CP block */
 	struct adv7842_state *state = to_state(sd);
 	struct v4l2_dv_timings timings;
-	int temp;
 	u8 reg_io_0x02 = io_read(sd, 0x02);
 	u8 reg_io_0x21 = io_read(sd, 0x21);
 	u8 reg_rep_0x77 = rep_read(sd, 0x77);
@@ -2813,9 +2812,8 @@ static int adv7842_cp_log_status(struct v4l2_subdev *sd)
 		  (((reg_io_0x02 >> 2) & 0x01) ^ (reg_io_0x02 & 0x01)) ?
 			"(16-235)" : "(0-255)",
 		  (reg_io_0x02 & 0x08) ? "enabled" : "disabled");
-	temp = cp_read(sd, 0xf4) >> 4;
 	v4l2_info(sd, "Color space conversion: %s\n",
-		  temp < 0 ? "" : csc_coeff_sel_rb[temp]);
+		  csc_coeff_sel_rb[cp_read(sd, 0xf4) >> 4]);
 
 	if (!is_digital_input(sd))
 		return 0;
@@ -2845,9 +2843,8 @@ static int adv7842_cp_log_status(struct v4l2_subdev *sd)
 			hdmi_read(sd, 0x5f));
 	v4l2_info(sd, "AV Mute: %s\n",
 			(hdmi_read(sd, 0x04) & 0x40) ? "on" : "off");
-	temp = hdmi_read(sd, 0x0b) >> 6;
 	v4l2_info(sd, "Deep color mode: %s\n",
-			temp < 0 ? "" : deep_color_mode_txt[temp]);
+			deep_color_mode_txt[hdmi_read(sd, 0x0b) >> 6]);
 
 	adv7842_log_infoframes(sd);
 
@@ -3575,7 +3572,7 @@ static int adv7842_probe(struct i2c_client *client,
 	err = media_entity_pads_init(&sd->entity, ADV7842_PAD_SOURCE + 1,
 				     state->pads);
 	if (err)
-		goto err_i2c;
+		goto err_work_queues;
 
 	err = adv7842_core_init(sd);
 	if (err)
@@ -3596,6 +3593,8 @@ static int adv7842_probe(struct i2c_client *client,
 
 err_entity:
 	media_entity_cleanup(&sd->entity);
+err_work_queues:
+	cancel_delayed_work(&state->delayed_work_enable_hotplug);
 err_i2c:
 	adv7842_unregister_clients(sd);
 err_hdl:

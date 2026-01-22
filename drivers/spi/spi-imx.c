@@ -498,15 +498,9 @@ static void mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
 {
 	u32 reg;
 
-	if (spi_imx->usedma) {
-		reg = readl(spi_imx->base + MX51_ECSPI_DMA);
-		reg |= MX51_ECSPI_DMA_TEDEN | MX51_ECSPI_DMA_RXDEN;
-		writel(reg, spi_imx->base + MX51_ECSPI_DMA);
-	} else {
-		reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
-		reg |= MX51_ECSPI_CTRL_XCH;
-		writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
-	}
+	reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
+	reg |= MX51_ECSPI_CTRL_XCH;
+	writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
 }
 
 static void mx51_disable_dma(struct spi_imx_data *spi_imx)
@@ -671,6 +665,7 @@ static void mx51_setup_wml(struct spi_imx_data *spi_imx)
 	writel(MX51_ECSPI_DMA_RX_WML(spi_imx->wml - 1) |
 		MX51_ECSPI_DMA_TX_WML(tx_wml) |
 		MX51_ECSPI_DMA_RXT_WML(spi_imx->wml) |
+		MX51_ECSPI_DMA_TEDEN | MX51_ECSPI_DMA_RXDEN |
 		MX51_ECSPI_DMA_RXTDEN, spi_imx->base + MX51_ECSPI_DMA);
 }
 
@@ -1426,8 +1421,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
 	dmaengine_submit(desc_tx);
 	reinit_completion(&spi_imx->dma_tx_completion);
 	dma_async_issue_pending(master->dma_tx);
-
-	spi_imx->devtype_data->trigger(spi_imx);
 
 	transfer_timeout = spi_imx_calculate_timeout(spi_imx, transfer->len);
 

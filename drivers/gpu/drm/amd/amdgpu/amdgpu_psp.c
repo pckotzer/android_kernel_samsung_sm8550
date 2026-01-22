@@ -353,6 +353,7 @@ static int psp_sw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct psp_context *psp = &adev->psp;
+	struct psp_gfx_cmd_resp *cmd = psp->cmd;
 
 	psp_memory_training_fini(psp);
 	if (psp->sos_fw) {
@@ -372,8 +373,8 @@ static int psp_sw_fini(void *handle)
 	    adev->asic_type == CHIP_SIENNA_CICHLID)
 		psp_sysfs_fini(adev);
 
-	kfree(psp->cmd);
-	psp->cmd = NULL;
+	kfree(cmd);
+	cmd = NULL;
 
 	amdgpu_bo_free_kernel(&psp->fw_pri_bo,
 			      &psp->fw_pri_mc_addr, &psp->fw_pri_buf);
@@ -488,7 +489,7 @@ psp_cmd_submit_buf(struct psp_context *psp,
 		ras_intr = amdgpu_ras_intr_triggered();
 		if (ras_intr)
 			break;
-		usleep_range(60, 100);
+		usleep_range(10, 100);
 		amdgpu_device_invalidate_hdp(psp->adev, NULL);
 	}
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -77,10 +77,8 @@ struct hgsl_hsync_fence *hgsl_hsync_fence_create(
 	}
 
 	fence->timeline = timeline;
-	INIT_LIST_HEAD(&fence->child_list);
 	spin_lock_irqsave(&timeline->lock, flags);
-	if (!dma_fence_is_signaled_locked(&fence->fence))
-		list_add_tail(&fence->child_list, &timeline->fence_list);
+	list_add_tail(&fence->child_list, &timeline->fence_list);
 	spin_unlock_irqrestore(&timeline->lock, flags);
 
 	return fence;
@@ -215,8 +213,7 @@ static void hgsl_hsync_fence_release(struct dma_fence *base)
 
 	if (timeline) {
 		spin_lock(&timeline->lock);
-		if (!list_empty(&fence->child_list))
-			list_del_init(&fence->child_list);
+		list_del_init(&fence->child_list);
 		spin_unlock(&timeline->lock);
 		hgsl_hsync_timeline_put(timeline);
 	}
@@ -393,10 +390,8 @@ int hgsl_isync_fence_create(struct hgsl_priv *priv, uint32_t timeline_id,
 	fd_install(*fence_fd, sync_file->file);
 
 	fence->timeline = timeline;
-	INIT_LIST_HEAD(&fence->child_list);
 	spin_lock_irqsave(&timeline->lock, flags);
-	if (!dma_fence_is_signaled_locked(&fence->fence))
-		list_add_tail(&fence->child_list, &timeline->fence_list);
+	list_add_tail(&fence->child_list, &timeline->fence_list);
 	spin_unlock_irqrestore(&timeline->lock, flags);
 
 out_fence:
@@ -792,8 +787,7 @@ static void hgsl_isync_fence_release(struct dma_fence *base)
 
 	if (timeline) {
 		spin_lock_irqsave(&timeline->lock, flags);
-		if (!list_empty(&fence->child_list))
-			list_del_init(&fence->child_list);
+		list_del_init(&fence->child_list);
 		spin_unlock_irqrestore(&timeline->lock, flags);
 
 		dma_fence_signal(base);

@@ -203,7 +203,6 @@ ssize_t strscpy(char *dest, const char *src, size_t count)
 	if (count == 0 || WARN_ON_ONCE(count > INT_MAX))
 		return -E2BIG;
 
-#ifndef CONFIG_DCACHE_WORD_ACCESS
 #ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
 	/*
 	 * If src is unaligned, don't cross a page boundary,
@@ -219,25 +218,11 @@ ssize_t strscpy(char *dest, const char *src, size_t count)
 	if (((long) dest | (long) src) & (sizeof(long) - 1))
 		max = 0;
 #endif
-#endif
-
-	/*
-	 * load_unaligned_zeropad() or read_word_at_a_time() below may read
-	 * uninitialized bytes after the trailing zero and use them in
-	 * comparisons. Disable this optimization under KMSAN to prevent
-	 * false positive reports.
-	 */
-	if (IS_ENABLED(CONFIG_KMSAN))
-		max = 0;
 
 	while (max >= sizeof(unsigned long)) {
 		unsigned long c, data;
 
-#ifdef CONFIG_DCACHE_WORD_ACCESS
-		c = load_unaligned_zeropad(src+res);
-#else
 		c = read_word_at_a_time(src+res);
-#endif
 		if (has_zero(c, &data, &constants)) {
 			data = prep_zero_mask(c, data, &constants);
 			data = create_zero_mask(data);
@@ -1164,61 +1149,24 @@ char *strnstr(const char *s1, const char *s2, size_t len)
 EXPORT_SYMBOL(strnstr);
 #endif
 
-#if defined(CONFIG_ARCH_HAS_FAST_MULTIPLIER) && BITS_PER_LONG == 64
-
-#define MEMCHR_MASK_GEN(mask) (mask *= 0x0101010101010101ULL)
-
-#elif defined(CONFIG_ARCH_HAS_FAST_MULTIPLIER)
-
-#define MEMCHR_MASK_GEN(mask)                                                  \
-	do {                                                                   \
-		mask *= 0x01010101;                                            \
-		mask |= mask << 32;                                            \
-	} while (0)
-
-#else
-
-#define MEMCHR_MASK_GEN(mask)                                                  \
-	do {                                                                   \
-		mask |= mask << 8;                                             \
-		mask |= mask << 16;                                            \
-		mask |= mask << 32;                                            \
-	} while (0)
-
-#endif
-
 #ifndef __HAVE_ARCH_MEMCHR
 /**
  * memchr - Find a character in an area of memory.
- * @p: The memory area
+ * @s: The memory area
  * @c: The byte to search for
- * @length: The size of the area.
+ * @n: The size of the area.
  *
  * returns the address of the first occurrence of @c, or %NULL
  * if @c is not found
  */
-void *memchr(const void *p, int c, unsigned long length)
+void *memchr(const void *s, int c, size_t n)
 {
-	u64 mask, val;
-	const void *end = p + length;
-
-	c &= 0xff;
-	if (p <= end - 8) {
-		mask = c;
-		MEMCHR_MASK_GEN(mask);
-
-		for (; p <= end - 8; p += 8) {
-			val = *(u64 *)p ^ mask;
-			if ((val + 0xfefefefefefefeffu) &
-			    (~val & 0x8080808080808080u))
-				break;
+	const unsigned char *p = s;
+	while (n-- != 0) {
+        	if ((unsigned char)c == *p++) {
+			return (void *)(p - 1);
 		}
 	}
-
-	for (; p < end; p++)
-		if (*(unsigned char *)p == c)
-			return (void *)p;
-
 	return NULL;
 }
 EXPORT_SYMBOL(memchr);
@@ -1254,7 +1202,16 @@ void *memchr_inv(const void *start, int c, size_t bytes)
 		return check_bytes8(start, value, bytes);
 
 	value64 = value;
-	MEMCHR_MASK_GEN(value64);
+#if defined(CONFIG_ARCH_HAS_FAST_MULTIPLIER) && BITS_PER_LONG == 64
+	value64 *= 0x0101010101010101ULL;
+#elif defined(CONFIG_ARCH_HAS_FAST_MULTIPLIER)
+	value64 *= 0x01010101;
+	value64 |= value64 << 32;
+#else
+	value64 |= value64 << 8;
+	value64 |= value64 << 16;
+	value64 |= value64 << 32;
+#endif
 
 	prefix = (unsigned long)start % 8;
 	if (prefix) {

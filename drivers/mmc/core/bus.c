@@ -15,7 +15,6 @@
 #include <linux/stat.h>
 #include <linux/of.h>
 #include <linux/pm_runtime.h>
-#include <linux/sysfs.h>
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
@@ -35,13 +34,13 @@ static ssize_t type_show(struct device *dev,
 
 	switch (card->type) {
 	case MMC_TYPE_MMC:
-		return sysfs_emit(buf, "MMC\n");
+		return sprintf(buf, "MMC\n");
 	case MMC_TYPE_SD:
-		return sysfs_emit(buf, "SD\n");
+		return sprintf(buf, "SD\n");
 	case MMC_TYPE_SDIO:
-		return sysfs_emit(buf, "SDIO\n");
+		return sprintf(buf, "SDIO\n");
 	case MMC_TYPE_SD_COMBO:
-		return sysfs_emit(buf, "SDcombo\n");
+		return sprintf(buf, "SDcombo\n");
 	default:
 		return -EFAULT;
 	}

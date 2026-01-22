@@ -102,26 +102,25 @@ i40e_notify_client_of_vf_msg(struct i40e_vsi *vsi, u32 vf_id, u8 *msg, u16 len)
 
 /**
  * i40e_notify_client_of_l2_param_changes - call the client notify callback
- * @pf: PF device pointer
+ * @vsi: the VSI with l2 param changes
  *
- * If there is a client, call its callback
+ * If there is a client to this VSI, call the client
  **/
-void i40e_notify_client_of_l2_param_changes(struct i40e_pf *pf)
+void i40e_notify_client_of_l2_param_changes(struct i40e_vsi *vsi)
 {
+	struct i40e_pf *pf = vsi->back;
 	struct i40e_client_instance *cdev = pf->cinst;
-	struct i40e_vsi *vsi = pf->vsi[pf->lan_vsi];
 	struct i40e_params params;
 
 	if (!cdev || !cdev->client)
 		return;
 	if (!cdev->client->ops || !cdev->client->ops->l2_param_change) {
-		dev_dbg(&pf->pdev->dev,
+		dev_dbg(&vsi->back->pdev->dev,
 			"Cannot locate client instance l2_param_change routine\n");
 		return;
 	}
 	if (!test_bit(__I40E_CLIENT_INSTANCE_OPENED, &cdev->state)) {
-		dev_dbg(&pf->pdev->dev,
-			"Client is not open, abort l2 param change\n");
+		dev_dbg(&vsi->back->pdev->dev, "Client is not open, abort l2 param change\n");
 		return;
 	}
 	memset(&params, 0, sizeof(params));
@@ -161,19 +160,20 @@ static void i40e_client_release_qvlist(struct i40e_info *ldev)
 
 /**
  * i40e_notify_client_of_netdev_close - call the client close callback
- * @pf: PF device pointer
+ * @vsi: the VSI with netdev closed
  * @reset: true when close called due to a reset pending
  *
  * If there is a client to this netdev, call the client with close
  **/
-void i40e_notify_client_of_netdev_close(struct i40e_pf *pf, bool reset)
+void i40e_notify_client_of_netdev_close(struct i40e_vsi *vsi, bool reset)
 {
+	struct i40e_pf *pf = vsi->back;
 	struct i40e_client_instance *cdev = pf->cinst;
 
 	if (!cdev || !cdev->client)
 		return;
 	if (!cdev->client->ops || !cdev->client->ops->close) {
-		dev_dbg(&pf->pdev->dev,
+		dev_dbg(&vsi->back->pdev->dev,
 			"Cannot locate client instance close routine\n");
 		return;
 	}
@@ -362,8 +362,8 @@ static void i40e_client_add_instance(struct i40e_pf *pf)
 	if (i40e_client_get_params(vsi, &cdev->lan_info.params))
 		goto free_cdev;
 
-	mac = list_first_entry_or_null(&cdev->lan_info.netdev->dev_addrs.list,
-				       struct netdev_hw_addr, list);
+	mac = list_first_entry(&cdev->lan_info.netdev->dev_addrs.list,
+			       struct netdev_hw_addr, list);
 	if (mac)
 		ether_addr_copy(cdev->lan_info.lanmac, mac->addr);
 	else

@@ -297,10 +297,13 @@ static int svc_i3c_master_handle_ibi(struct svc_i3c_master *master,
 	int ret, val;
 	u8 *buf;
 
-	/*
-	 * Wait for transfer to complete before returning. Otherwise, the EmitStop
-	 * request might be sent when the transfer is not complete.
-	 */
+	slot = i3c_generic_ibi_get_free_slot(data->ibi_pool);
+	if (!slot)
+		return -ENOSPC;
+
+	slot->len = 0;
+	buf = slot->data;
+
 	ret = readl_relaxed_poll_timeout(master->regs + SVC_I3C_MSTATUS, val,
 						SVC_I3C_MSTATUS_COMPLETE(val), 0, 1000);
 	if (ret) {
@@ -308,21 +311,11 @@ static int svc_i3c_master_handle_ibi(struct svc_i3c_master *master,
 		return ret;
 	}
 
-	slot = i3c_generic_ibi_get_free_slot(data->ibi_pool);
-	if (!slot) {
-		dev_dbg(master->dev, "No free ibi slot, drop the data\n");
-		writel(SVC_I3C_MDATACTRL_FLUSHRB, master->regs + SVC_I3C_MDATACTRL);
-		return -ENOSPC;
-	}
-
-	slot->len = 0;
-	buf = slot->data;
-
 	while (SVC_I3C_MSTATUS_RXPEND(readl(master->regs + SVC_I3C_MSTATUS))  &&
 	       slot->len < SVC_I3C_FIFO_SIZE) {
 		mdatactrl = readl(master->regs + SVC_I3C_MDATACTRL);
 		count = SVC_I3C_MDATACTRL_RXCOUNT(mdatactrl);
-		readsb(master->regs + SVC_I3C_MRDATAB, buf, count);
+		readsl(master->regs + SVC_I3C_MRDATAB, buf, count);
 		slot->len += count;
 		buf += count;
 	}
@@ -357,8 +350,8 @@ static void svc_i3c_master_ibi_work(struct work_struct *work)
 {
 	struct svc_i3c_master *master = container_of(work, struct svc_i3c_master, ibi_work);
 	struct svc_i3c_i2c_dev_data *data;
-	struct i3c_dev_desc *dev = NULL;
 	unsigned int ibitype, ibiaddr;
+	struct i3c_dev_desc *dev;
 	u32 status, val;
 	int ret;
 
@@ -419,7 +412,7 @@ static void svc_i3c_master_ibi_work(struct work_struct *work)
 	 * for the slave to interrupt again.
 	 */
 	if (svc_i3c_master_error(master)) {
-		if (master->ibi.tbq_slot && dev) {
+		if (master->ibi.tbq_slot) {
 			data = i3c_dev_get_master_data(dev);
 			i3c_generic_ibi_recycle_slot(data->ibi_pool,
 						     master->ibi.tbq_slot);
@@ -444,8 +437,6 @@ static void svc_i3c_master_ibi_work(struct work_struct *work)
 		queue_work(master->base.wq, &master->hj_work);
 		break;
 	case SVC_I3C_MSTATUS_IBITYPE_MASTER_REQUEST:
-		svc_i3c_master_emit_stop(master);
-		break;
 	default:
 		break;
 	}
@@ -816,7 +807,7 @@ static int svc_i3c_update_ibirules(struct svc_i3c_master *master)
 
 	/* Create the IBIRULES register for both cases */
 	i3c_bus_for_each_i3cdev(&master->base.bus, dev) {
-		if (!(dev->info.bcr & I3C_BCR_IBI_REQ_CAP))
+		if (I3C_BCR_DEVICE_ROLE(dev->info.bcr) == I3C_BCR_I3C_MASTER)
 			continue;
 
 		if (dev->info.bcr & I3C_BCR_IBI_PAYLOAD) {

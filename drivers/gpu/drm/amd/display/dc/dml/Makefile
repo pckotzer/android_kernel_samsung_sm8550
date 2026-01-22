@@ -26,8 +26,7 @@
 # subcomponents.
 
 ifdef CONFIG_X86
-dml_ccflags-$(CONFIG_CC_IS_GCC) := -mhard-float
-dml_ccflags := $(dml_ccflags-y) -msse
+dml_ccflags := -mhard-float -msse
 endif
 
 ifdef CONFIG_PPC64
@@ -35,7 +34,7 @@ dml_ccflags := -mhard-float -maltivec
 endif
 
 ifdef CONFIG_CC_IS_GCC
-ifneq ($(call gcc-min-version, 70100),y)
+ifeq ($(call cc-ifversion, -lt, 0701, y), y)
 IS_OLD_GCC = 1
 endif
 endif

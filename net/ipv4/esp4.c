@@ -196,10 +196,8 @@ static int esp_output_tcp_finish(struct xfrm_state *x, struct sk_buff *skb)
 
 	sk = esp_find_tcp_sk(x);
 	err = PTR_ERR_OR_ZERO(sk);
-	if (err) {
-		kfree_skb(skb);
+	if (err)
 		goto out;
-	}
 
 	bh_lock_sock(sk);
 	if (sock_owned_by_user(sk))

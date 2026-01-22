@@ -789,9 +789,6 @@ static int svc_rdma_copy_inline_range(struct svc_rdma_read_info *info,
 	for (page_no = 0; page_no < numpages; page_no++) {
 		unsigned int page_len;
 
-		if (info->ri_pageno >= RPCSVC_MAXPAGES)
-			return -EINVAL;
-
 		page_len = min_t(unsigned int, remaining,
 				 PAGE_SIZE - info->ri_pageoff);
 
@@ -811,7 +808,7 @@ static int svc_rdma_copy_inline_range(struct svc_rdma_read_info *info,
 		offset += page_len;
 	}
 
-	return 0;
+	return -EINVAL;
 }
 
 /**

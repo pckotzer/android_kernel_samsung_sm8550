@@ -438,6 +438,10 @@
 	status = "okay";
 };
 
+&hdmi_sound {
+	status = "okay";
+};
+
 &i2c0 {
 	clock-frequency = <400000>;
 	i2c-scl-falling-time-ns = <4>;
@@ -974,7 +978,6 @@
 		reg = <0>;
 		m25p,fast-read;
 		spi-max-frequency = <10000000>;
-		vcc-supply = <&vcc_3v0>;
 	};
 };
 

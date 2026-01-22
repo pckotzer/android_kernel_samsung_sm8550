@@ -1725,7 +1725,12 @@ int qla24xx_fcport_handle_login(struct scsi_qla_host *vha, fc_port_t *fcport)
 			}
 			break;
 		default:
-			if (fcport->loop_id == FC_NO_LOOP_ID) {
+			if (wwn == 0)    {
+				ql_dbg(ql_dbg_disc, vha, 0xffff,
+				    "%s %d %8phC post GNNID\n",
+				    __func__, __LINE__, fcport->port_name);
+				qla24xx_post_gnnid_work(vha, fcport);
+			} else if (fcport->loop_id == FC_NO_LOOP_ID) {
 				ql_dbg(ql_dbg_disc, vha, 0x20bd,
 				    "%s %d %8phC post gnl\n",
 				    __func__, __LINE__, fcport->port_name);
@@ -2056,11 +2061,11 @@ static void qla_marker_sp_done(srb_t *sp, int res)
 	int cnt = 5; \
 	do { \
 		if (_chip_gen != sp->vha->hw->chip_reset || _login_gen != sp->fcport->login_gen) {\
-			_rval = -EINVAL; \
+			_rval = EINVAL; \
 			break; \
 		} \
 		_rval = qla2x00_start_sp(_sp); \
-		if (_rval == -EAGAIN) \
+		if (_rval == EAGAIN) \
 			msleep(1); \
 		else \
 			break; \
@@ -2468,23 +2473,8 @@ qla24xx_handle_plogi_done_event(struct scsi_qla_host *vha, struct event_arg *ea)
 	    ea->sp->gen1, fcport->rscn_gen,
 	    ea->data[0], ea->data[1], ea->iop[0], ea->iop[1]);
 
-	if (fcport->fw_login_state == DSC_LS_PLOGI_PEND) {
-		ql_dbg(ql_dbg_disc, vha, 0x20ea,
-		    "%s %d %8phC Remote is trying to login\n",
-		    __func__, __LINE__, fcport->port_name);
-		/*
-		 * If we get here, there is port thats already logged in,
-		 * but it's state has not moved ahead. Recheck with FW on
-		 * what state it is in and proceed ahead
-		 */
-		if (!N2N_TOPO(vha->hw)) {
-			fcport->fw_login_state = DSC_LS_PRLI_COMP;
-			qla24xx_post_gpdb_work(vha, fcport, 0);
-		}
-		return;
-	}
-
-	if (fcport->fw_login_state == DSC_LS_PRLI_PEND) {
+	if ((fcport->fw_login_state == DSC_LS_PLOGI_PEND) ||
+	    (fcport->fw_login_state == DSC_LS_PRLI_PEND)) {
 		ql_dbg(ql_dbg_disc, vha, 0x20ea,
 		    "%s %d %8phC Remote is trying to login\n",
 		    __func__, __LINE__, fcport->port_name);
@@ -2693,7 +2683,7 @@ exit:
 	return rval;
 }
 
-void qla_enable_fce_trace(scsi_qla_host_t *vha)
+static void qla_enable_fce_trace(scsi_qla_host_t *vha)
 {
 	int rval;
 	struct qla_hw_data *ha = vha->hw;
@@ -3729,24 +3719,25 @@ qla24xx_chip_diag(scsi_qla_host_t *vha)
 	return rval;
 }
 
-int qla2x00_alloc_fce_trace(scsi_qla_host_t *vha)
+static void
+qla2x00_alloc_fce_trace(scsi_qla_host_t *vha)
 {
 	dma_addr_t tc_dma;
 	void *tc;
 	struct qla_hw_data *ha = vha->hw;
 
 	if (!IS_FWI2_CAPABLE(ha))
-		return -EINVAL;
+		return;
 
 	if (!IS_QLA25XX(ha) && !IS_QLA81XX(ha) && !IS_QLA83XX(ha) &&
 	    !IS_QLA27XX(ha) && !IS_QLA28XX(ha))
-		return -EINVAL;
+		return;
 
 	if (ha->fce) {
 		ql_dbg(ql_dbg_init, vha, 0x00bd,
 		       "%s: FCE Mem is already allocated.\n",
 		       __func__);
-		return -EIO;
+		return;
 	}
 
 	/* Allocate memory for Fibre Channel Event Buffer. */
@@ -3756,7 +3747,7 @@ int qla2x00_alloc_fce_trace(scsi_qla_host_t *vha)
 		ql_log(ql_log_warn, vha, 0x00be,
 		       "Unable to allocate (%d KB) for FCE.\n",
 		       FCE_SIZE / 1024);
-		return -ENOMEM;
+		return;
 	}
 
 	ql_dbg(ql_dbg_init, vha, 0x00c0,
@@ -3765,16 +3756,6 @@ int qla2x00_alloc_fce_trace(scsi_qla_host_t *vha)
 	ha->fce_dma = tc_dma;
 	ha->fce = tc;
 	ha->fce_bufs = FCE_NUM_BUFFERS;
-	return 0;
-}
-
-void qla2x00_free_fce_trace(struct qla_hw_data *ha)
-{
-	if (!ha->fce)
-		return;
-	dma_free_coherent(&ha->pdev->dev, FCE_SIZE, ha->fce, ha->fce_dma);
-	ha->fce = NULL;
-	ha->fce_dma = 0;
 }
 
 static void
@@ -3865,10 +3846,9 @@ qla2x00_alloc_fw_dump(scsi_qla_host_t *vha)
 		if (ha->tgt.atio_ring)
 			mq_size += ha->tgt.atio_q_length * sizeof(request_t);
 
-		if (ha->fce) {
+		qla2x00_alloc_fce_trace(vha);
+		if (ha->fce)
 			fce_size = sizeof(struct qla2xxx_fce_chain) + FCE_SIZE;
-			ha->flags.fce_dump_buf_alloced = 1;
-		}
 		qla2x00_alloc_eft_trace(vha);
 		if (ha->eft)
 			eft_size = EFT_SIZE;
@@ -6457,7 +6437,10 @@ qla2x00_configure_fabric(scsi_qla_host_t *vha)
 		if (USE_ASYNC_SCAN(ha)) {
 			/* start of scan begins here */
 			vha->scan.rscn_gen_end = atomic_read(&vha->rscn_gen);
-			qla_fab_scan_start(vha);
+			rval = qla24xx_async_gpnft(vha, FC4_TYPE_FCP_SCSI,
+			    NULL);
+			if (rval)
+				set_bit(LOOP_RESYNC_NEEDED, &vha->dpc_flags);
 		} else  {
 			list_for_each_entry(fcport, &vha->vp_fcports, list)
 				fcport->scan_state = QLA_FCPORT_SCAN;

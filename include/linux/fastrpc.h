@@ -18,7 +18,6 @@ enum fastrpc_driver_status {
 enum fastrpc_driver_invoke_nums {
 	FASTRPC_DEV_MAP_DMA = 1,
 	FASTRPC_DEV_UNMAP_DMA,
-	FASTRPC_DEV_GET_HLOS_PID,
 };
 
 /**
@@ -43,14 +42,6 @@ struct fastrpc_dev_map_dma {
 struct fastrpc_dev_unmap_dma {
 	struct dma_buf *buf;
 	size_t size;
-};
-
-/**
- * struct fastrpc_dev_get_hlos_pid - fastrpc dma buffer unmap structure
- * @hlos_pid   : HLOS PID of attached device
- */
-struct fastrpc_dev_get_hlos_pid {
-	int hlos_pid;
 };
 
 /**

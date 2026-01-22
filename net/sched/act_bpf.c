@@ -46,10 +46,12 @@ static int tcf_bpf_act(struct sk_buff *skb, const struct tc_action *act,
 	filter = rcu_dereference(prog->filter);
 	if (at_ingress) {
 		__skb_push(skb, skb->mac_len);
-		filter_res = bpf_prog_run_data_pointers(filter, skb);
+		bpf_compute_data_pointers(skb);
+		filter_res = bpf_prog_run(filter, skb);
 		__skb_pull(skb, skb->mac_len);
 	} else {
-		filter_res = bpf_prog_run_data_pointers(filter, skb);
+		bpf_compute_data_pointers(skb);
+		filter_res = bpf_prog_run(filter, skb);
 	}
 	if (skb_sk_is_prefetched(skb) && filter_res != TC_ACT_OK)
 		skb_orphan(skb);

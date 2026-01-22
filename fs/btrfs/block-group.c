@@ -1543,17 +1543,6 @@ void btrfs_reclaim_bgs_work(struct work_struct *work)
 			up_write(&space_info->groups_sem);
 			goto next;
 		}
-
-		/*
-		 * Cache the zone_unusable value before turning the block group
-		 * to read only. As soon as the block group is read only it's
-		 * zone_unusable value gets moved to the block group's read-only
-		 * bytes and isn't available for calculations anymore. We also
-		 * cache it before unlocking the block group, to prevent races
-		 * (reports from KCSAN and such tools) with tasks updating it.
-		 */
-		zone_unusable = bg->zone_unusable;
-
 		spin_unlock(&bg->lock);
 
 		/*
@@ -1569,6 +1558,13 @@ void btrfs_reclaim_bgs_work(struct work_struct *work)
 			goto next;
 		}
 
+		/*
+		 * Cache the zone_unusable value before turning the block group
+		 * to read only. As soon as the blog group is read only it's
+		 * zone_unusable value gets moved to the block group's read-only
+		 * bytes and isn't available for calculations anymore.
+		 */
+		zone_unusable = bg->zone_unusable;
 		ret = inc_block_group_ro(bg, 0);
 		up_write(&space_info->groups_sem);
 		if (ret < 0)
@@ -3699,7 +3695,7 @@ int btrfs_chunk_alloc(struct btrfs_trans_handle *trans, u64 flags,
 			mutex_unlock(&fs_info->chunk_mutex);
 		} else {
 			/* Proceed with allocation */
-			space_info->chunk_alloc = true;
+			space_info->chunk_alloc = 1;
 			wait_for_alloc = false;
 			spin_unlock(&space_info->lock);
 		}
@@ -3735,7 +3731,7 @@ int btrfs_chunk_alloc(struct btrfs_trans_handle *trans, u64 flags,
 	spin_lock(&space_info->lock);
 	if (ret < 0) {
 		if (ret == -ENOSPC)
-			space_info->full = true;
+			space_info->full = 1;
 		else
 			goto out;
 	} else {
@@ -3745,7 +3741,7 @@ int btrfs_chunk_alloc(struct btrfs_trans_handle *trans, u64 flags,
 
 	space_info->force_alloc = CHUNK_ALLOC_NO_FORCE;
 out:
-	space_info->chunk_alloc = false;
+	space_info->chunk_alloc = 0;
 	spin_unlock(&space_info->lock);
 	mutex_unlock(&fs_info->chunk_mutex);
 

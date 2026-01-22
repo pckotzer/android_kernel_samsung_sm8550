@@ -294,7 +294,6 @@ static int snd_wavefront_midi_input_close(struct snd_rawmidi_substream *substrea
 	        return -EIO;
 
 	spin_lock_irqsave (&midi->open, flags);
-	midi->substream_input[mpu] = NULL;
 	midi->mode[mpu] &= ~MPU401_MODE_INPUT;
 	spin_unlock_irqrestore (&midi->open, flags);
 
@@ -319,7 +318,6 @@ static int snd_wavefront_midi_output_close(struct snd_rawmidi_substream *substre
 	        return -EIO;
 
 	spin_lock_irqsave (&midi->open, flags);
-	midi->substream_output[mpu] = NULL;
 	midi->mode[mpu] &= ~MPU401_MODE_OUTPUT;
 	spin_unlock_irqrestore (&midi->open, flags);
 	return 0;
@@ -503,8 +501,7 @@ snd_wavefront_midi_start (snd_wavefront_card_t *card)
 	for (i = 0; i < 30000 && !output_ready (midi); i++);
 
 	if (!output_ready (midi)) {
-		dev_err(card->wavefront.card->dev,
-			"MIDI interface not ready for command\n");
+		snd_printk ("MIDI interface not ready for command\n");
 		return -1;
 	}
 
@@ -526,8 +523,7 @@ snd_wavefront_midi_start (snd_wavefront_card_t *card)
 	}
 
 	if (!ok) {
-		dev_err(card->wavefront.card->dev,
-			"cannot set UART mode for MIDI interface");
+		snd_printk ("cannot set UART mode for MIDI interface");
 		dev->interrupts_are_midi = 0;
 		return -1;
 	}
@@ -535,8 +531,7 @@ snd_wavefront_midi_start (snd_wavefront_card_t *card)
 	/* Route external MIDI to WaveFront synth (by default) */
     
 	if (snd_wavefront_cmd (dev, WFC_MISYNTH_ON, rbuf, wbuf)) {
-		dev_warn(card->wavefront.card->dev,
-			 "can't enable MIDI-IN-2-synth routing.\n");
+		snd_printk ("can't enable MIDI-IN-2-synth routing.\n");
 		/* XXX error ? */
 	}
 
@@ -552,16 +547,14 @@ snd_wavefront_midi_start (snd_wavefront_card_t *card)
 	*/
 
 	if (snd_wavefront_cmd (dev, WFC_VMIDI_OFF, rbuf, wbuf)) { 
-		dev_warn(card->wavefront.card->dev,
-			 "virtual MIDI mode not disabled\n");
+		snd_printk ("virtual MIDI mode not disabled\n");
 		return 0; /* We're OK, but missing the external MIDI dev */
 	}
 
 	snd_wavefront_midi_enable_virtual (card);
 
 	if (snd_wavefront_cmd (dev, WFC_VMIDI_ON, rbuf, wbuf)) {
-		dev_warn(card->wavefront.card->dev,
-			 "cannot enable virtual MIDI mode.\n");
+		snd_printk ("cannot enable virtual MIDI mode.\n");
 		snd_wavefront_midi_disable_virtual (card);
 	} 
 	return 0;

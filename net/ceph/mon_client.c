@@ -1418,7 +1418,7 @@ static int mon_handle_auth_done(struct ceph_connection *con,
 	if (!ret)
 		finish_hunting(monc);
 	mutex_unlock(&monc->mutex);
-	return ret;
+	return 0;
 }
 
 static int mon_handle_auth_bad_method(struct ceph_connection *con,
