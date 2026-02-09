@@ -108,6 +108,10 @@ static ssize_t pm_async_store(struct kobject *kobj, struct kobj_attribute *attr,
 {
 	unsigned long val;
 
+
+	/* Don't let anything in Android change the freeze timeout */
+	return n;
+
 	if (kstrtoul(buf, 10, &val))
 		return -EINVAL;
 

@@ -119,8 +119,8 @@ asm-arch := armv8.5-a
 endif
 
 # --- CPU/Arch spezifische Flags ---
-ARM64_CPU_FLAGS := cortex-a510+crc+crypto+fp+simd+sve2+rdm+dotprod+aes+sha2+sha3+sm4+fp16
-ARM64_MARCH_FLAGS := armv9-a+crc+crypto+fp+simd+sve2+rdm+dotprod+aes+sha2+sha3+sm4+fp16
+ARM64_CPU_FLAGS := cortex-a510+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16
+ARM64_MARCH_FLAGS := armv9-2a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16
 ARM64_TUNE_FLAGS := neoverse-n1
 ARM64_OPT_FLAGS := -O3
 

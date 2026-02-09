@@ -316,13 +316,13 @@ static unsigned long waltgov_get_util(struct waltgov_cpu *wg_cpu)
 }
 
 #define NL_RATIO 75
-#define DEFAULT_ADAPTIVE_HIGH_FREQ 1100000
-#define DEFAULT_ADAPTIVE_LOW_FREQ 550000
-#define DEFAULT_HISPEED_LOAD 75
-#define DEFAULT_SILVER_RTG_BOOST_FREQ 1000000
-#define DEFAULT_GOLD_RTG_BOOST_FREQ 768000
-#define DEFAULT_PRIME_RTG_BOOST_FREQ 0
-#define DEFAULT_TARGET_LOAD_THRESH 1024
+//#define DEFAULT_ADAPTIVE_HIGH_FREQ 1100000
+//#define DEFAULT_ADAPTIVE_LOW_FREQ 550000
+#define DEFAULT_HISPEED_LOAD 40
+#define DEFAULT_SILVER_RTG_BOOST_FREQ 1785600
+#define DEFAULT_GOLD_RTG_BOOST_FREQ 940800
+#define DEFAULT_PRIME_RTG_BOOST_FREQ 940800
+#define DEFAULT_TARGET_LOAD_THRESH 0
 #define DEFAULT_TARGET_LOAD_SHIFT 0
 static inline void max_and_reason(unsigned long *cur_util, unsigned long boost_util,
 		struct waltgov_cpu *wg_cpu, unsigned int reason)
