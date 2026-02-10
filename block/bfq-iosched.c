@@ -179,7 +179,7 @@ static u64 bfq_slice_idle = NSEC_PER_SEC / 125;
 static const int bfq_stats_min_budgets = 194;
 
 /* Default maximum budget values, in sectors and number of requests. */
-static const int bfq_default_max_budget = 16 * 1024;
+static const int bfq_default_max_budget = 155;
 
 /*
  * When a sync request is dispatched, the queue that contains that
@@ -7019,7 +7019,7 @@ static int bfq_init_queue(struct request_queue *q, struct elevator_type *e)
 	bfqd->nonrot_with_queueing = blk_queue_nonrot(bfqd->queue);
 
 	bfqd->bfq_max_budget = bfq_default_max_budget;
-
+	bfqd->bfq_user_max_budget = bfq_default_max_budget;
 	bfqd->bfq_fifo_expire[0] = bfq_fifo_expire[0];
 	bfqd->bfq_fifo_expire[1] = bfq_fifo_expire[1];
 	bfqd->bfq_back_max = bfq_back_max;
