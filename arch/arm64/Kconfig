@@ -369,7 +369,7 @@ config ARM64_WORKAROUND_CLEAN_CACHE
 
 config ARM64_ERRATUM_826319
 	bool "Cortex-A53: 826319: System might deadlock if a write cannot complete until read data is accepted"
-	default y
+	default n
 	select ARM64_WORKAROUND_CLEAN_CACHE
 	help
 	  This option adds an alternative code sequence to work around ARM
@@ -391,7 +391,7 @@ config ARM64_ERRATUM_826319
 
 config ARM64_ERRATUM_827319
 	bool "Cortex-A53: 827319: Data cache clean instructions might cause overlapping transactions to the interconnect"
-	default y
+	default n
 	select ARM64_WORKAROUND_CLEAN_CACHE
 	help
 	  This option adds an alternative code sequence to work around ARM
@@ -413,7 +413,7 @@ config ARM64_ERRATUM_827319
 
 config ARM64_ERRATUM_824069
 	bool "Cortex-A53: 824069: Cache line might not be marked as clean after a CleanShared snoop"
-	default y
+	default n
 	select ARM64_WORKAROUND_CLEAN_CACHE
 	help
 	  This option adds an alternative code sequence to work around ARM
@@ -436,7 +436,7 @@ config ARM64_ERRATUM_824069
 
 config ARM64_ERRATUM_819472
 	bool "Cortex-A53: 819472: Store exclusive instructions might cause data corruption"
-	default y
+	default n
 	select ARM64_WORKAROUND_CLEAN_CACHE
 	help
 	  This option adds an alternative code sequence to work around ARM
@@ -458,7 +458,7 @@ config ARM64_ERRATUM_819472
 
 config ARM64_ERRATUM_832075
 	bool "Cortex-A57: 832075: possible deadlock on mixing exclusive memory accesses with device loads"
-	default y
+	default n
 	help
 	  This option adds an alternative code sequence to work around ARM
 	  erratum 832075 on Cortex-A57 parts up to r1p2.
@@ -477,7 +477,7 @@ config ARM64_ERRATUM_832075
 config ARM64_ERRATUM_834220
 	bool "Cortex-A57: 834220: Stage 2 translation fault might be incorrectly reported in presence of a Stage 1 fault"
 	depends on KVM
-	default y
+	default n
 	help
 	  This option adds an alternative code sequence to work around ARM
 	  erratum 834220 on Cortex-A57 parts up to r1p2.
@@ -498,7 +498,7 @@ config ARM64_ERRATUM_834220
 config ARM64_ERRATUM_845719
 	bool "Cortex-A53: 845719: a load might read incorrect data"
 	depends on COMPAT
-	default y
+	default n
 	help
 	  This option adds an alternative code sequence to work around ARM
 	  erratum 845719 on Cortex-A53 parts up to r0p4.
@@ -518,7 +518,7 @@ config ARM64_ERRATUM_845719
 
 config ARM64_ERRATUM_843419
 	bool "Cortex-A53: 843419: A load or store might access an incorrect address"
-	default y
+	default n
 	select ARM64_MODULE_PLTS if MODULES
 	help
 	  This option links the kernel with '--fix-cortex-a53-843419' and
@@ -533,7 +533,7 @@ config ARM64_LD_HAS_FIX_ERRATUM_843419
 
 config ARM64_ERRATUM_1024718
 	bool "Cortex-A55: 1024718: Update of DBM/AP bits without break before make might result in incorrect update"
-	default y
+	default n
 	help
 	  This option adds a workaround for ARM Cortex-A55 Erratum 1024718.
 
@@ -547,7 +547,7 @@ config ARM64_ERRATUM_1024718
 
 config ARM64_ERRATUM_1418040
 	bool "Cortex-A76/Neoverse-N1: MRC read following MRRC read of specific Generic Timer in AArch32 might give incorrect result"
-	default y
+	default n
 	depends on COMPAT
 	help
 	  This option adds a workaround for ARM Cortex-A76/Neoverse-N1
@@ -564,7 +564,7 @@ config ARM64_WORKAROUND_SPECULATIVE_AT
 
 config ARM64_ERRATUM_1165522
 	bool "Cortex-A76: 1165522: Speculative AT instruction using out-of-context translation regime could cause subsequent request to generate an incorrect translation"
-	default y
+	default n
 	select ARM64_WORKAROUND_SPECULATIVE_AT
 	help
 	  This option adds a workaround for ARM Cortex-A76 erratum 1165522.
@@ -577,7 +577,7 @@ config ARM64_ERRATUM_1165522
 
 config ARM64_ERRATUM_1319367
 	bool "Cortex-A57/A72: 1319537: Speculative AT instruction using out-of-context translation regime could cause subsequent request to generate an incorrect translation"
-	default y
+	default n
 	select ARM64_WORKAROUND_SPECULATIVE_AT
 	help
 	  This option adds work arounds for ARM Cortex-A57 erratum 1319537
@@ -590,7 +590,7 @@ config ARM64_ERRATUM_1319367
 
 config ARM64_ERRATUM_1530923
 	bool "Cortex-A55: 1530923: Speculative AT instruction using out-of-context translation regime could cause subsequent request to generate an incorrect translation"
-	default y
+	default n
 	select ARM64_WORKAROUND_SPECULATIVE_AT
 	help
 	  This option adds a workaround for ARM Cortex-A55 erratum 1530923.
@@ -606,7 +606,7 @@ config ARM64_WORKAROUND_REPEAT_TLBI
 
 config ARM64_ERRATUM_2441007
 	bool "Cortex-A55: Completion of affected memory accesses might not be guaranteed by completion of a TLBI"
-	default y
+	default n
 	select ARM64_WORKAROUND_REPEAT_TLBI
 	help
 	  This option adds a workaround for ARM Cortex-A55 erratum #2441007.
@@ -623,7 +623,7 @@ config ARM64_ERRATUM_2441007
 
 config ARM64_ERRATUM_1286807
 	bool "Cortex-A76: Modification of the translation table for a virtual address might lead to read-after-read ordering violation"
-	default y
+	default n
 	select ARM64_WORKAROUND_REPEAT_TLBI
 	help
 	  This option adds a workaround for ARM Cortex-A76 erratum 1286807.
@@ -639,7 +639,7 @@ config ARM64_ERRATUM_1286807
 
 config ARM64_ERRATUM_1463225
 	bool "Cortex-A76: Software Step might prevent interrupt recognition"
-	default y
+	default n
 	help
 	  This option adds a workaround for Arm Cortex-A76 erratum 1463225.
 
@@ -657,7 +657,7 @@ config ARM64_ERRATUM_1463225
 
 config ARM64_ERRATUM_1542419
 	bool "Neoverse-N1: workaround mis-ordering of instruction fetches"
-	default y
+	default n
 	depends on BROKEN # CPU cap re-allocated by Android
 	help
 	  This option adds a workaround for ARM Neoverse-N1 erratum
@@ -674,7 +674,7 @@ config ARM64_ERRATUM_1542419
 
 config ARM64_ERRATUM_1508412
 	bool "Cortex-A77: 1508412: workaround deadlock on sequence of NC/Device load and store exclusive or PAR read"
-	default y
+	default n
 	help
 	  This option adds a workaround for Arm Cortex-A77 erratum 1508412.
 
@@ -715,7 +715,7 @@ config ARM64_ERRATUM_2119858
 
 config ARM64_ERRATUM_2139208
 	bool "Neoverse-N2: 2139208: workaround TRBE overwriting trace data in FILL mode"
-	default y
+	default n
 	depends on CORESIGHT_TRBE
 	select ARM64_WORKAROUND_TRBE_OVERWRITE_FILL_MODE
 	help
@@ -751,7 +751,7 @@ config ARM64_ERRATUM_2054223
 
 config ARM64_ERRATUM_2067961
 	bool "Neoverse-N2: 2067961: workaround TSB instruction failing to flush trace"
-	default y
+	default n
 	select ARM64_WORKAROUND_TSB_FLUSH_FAILURE
 	help
 	  Enable workaround for ARM Neoverse-N2 erratum 2067961
@@ -770,7 +770,7 @@ config ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE
 config ARM64_ERRATUM_2253138
 	bool "Neoverse-N2: 2253138: workaround TRBE writing to address out-of-range"
 	depends on CORESIGHT_TRBE
-	default y
+	default n
 	select ARM64_WORKAROUND_TRBE_WRITE_OUT_OF_RANGE
 	help
 	  This option adds the workaround for ARM Neoverse-N2 erratum 2253138.
@@ -879,7 +879,7 @@ config ARM64_ERRATUM_3194386
 
 config CAVIUM_ERRATUM_22375
 	bool "Cavium erratum 22375, 24313"
-	default y
+	default n
 	help
 	  Enable workaround for errata 22375 and 24313.
 
@@ -897,7 +897,7 @@ config CAVIUM_ERRATUM_22375
 config CAVIUM_ERRATUM_23144
 	bool "Cavium erratum 23144: ITS SYNC hang on dual socket system"
 	depends on NUMA
-	default y
+	default n
 	help
 	  ITS SYNC command hang for cross node io and collections/cpu mapping.
 
@@ -905,7 +905,7 @@ config CAVIUM_ERRATUM_23144
 
 config CAVIUM_ERRATUM_23154
 	bool "Cavium erratum 23154: Access to ICC_IAR1_EL1 is not sync'ed"
-	default y
+	default n
 	help
 	  The gicv3 of ThunderX requires a modified version for
 	  reading the IAR status to ensure data synchronization
@@ -915,7 +915,7 @@ config CAVIUM_ERRATUM_23154
 
 config CAVIUM_ERRATUM_27456
 	bool "Cavium erratum 27456: Broadcast TLBI instructions may cause icache corruption"
-	default y
+	default n
 	depends on BROKEN # CPU cap re-allocated by Android
 	help
 	  On ThunderX T88 pass 1.x through 2.1 parts, broadcast TLBI
@@ -927,7 +927,7 @@ config CAVIUM_ERRATUM_27456
 
 config CAVIUM_ERRATUM_30115
 	bool "Cavium erratum 30115: Guest may disable interrupts in host"
-	default y
+	default n
 	depends on BROKEN # CPU cap re-allocated by Android
 	help
 	  On ThunderX T88 pass 1.x through 2.2, T81 pass 1.0 through
@@ -939,7 +939,7 @@ config CAVIUM_ERRATUM_30115
 
 config CAVIUM_TX2_ERRATUM_219
 	bool "Cavium ThunderX2 erratum 219: PRFM between TTBR change and ISB fails"
-	default y
+	default n
 	depends on BROKEN # CPU caps re-allocated by Android
 	help
 	  On Cavium ThunderX2, a load, store or prefetch instruction between a
@@ -957,7 +957,7 @@ config CAVIUM_TX2_ERRATUM_219
 
 config FUJITSU_ERRATUM_010001
 	bool "Fujitsu-A64FX erratum E#010001: Undefined fault may occur wrongly"
-	default y
+	default n
 	help
 	  This option adds a workaround for Fujitsu-A64FX erratum E#010001.
 	  On some variants of the Fujitsu-A64FX cores ver(1.0, 1.1), memory
@@ -976,7 +976,7 @@ config FUJITSU_ERRATUM_010001
 
 config HISILICON_ERRATUM_161600802
 	bool "Hip07 161600802: Erroneous redistributor VLPI base"
-	default y
+	default n
 	help
 	  The HiSilicon Hip07 SoC uses the wrong redistributor base
 	  when issued ITS commands such as VMOVP and VMAPP, and requires
@@ -986,7 +986,7 @@ config HISILICON_ERRATUM_161600802
 
 config QCOM_FALKOR_ERRATUM_1003
 	bool "Falkor E1003: Incorrect translation due to ASID change"
-	default y
+	default n
 	help
 	  On Falkor v1, an incorrect ASID may be cached in the TLB when ASID
 	  and BADDR are changed together in TTBRx_EL1. Since we keep the ASID
@@ -997,7 +997,7 @@ config QCOM_FALKOR_ERRATUM_1003
 
 config QCOM_FALKOR_ERRATUM_1009
 	bool "Falkor E1009: Prematurely complete a DSB after a TLBI"
-	default y
+	default n
 	select ARM64_WORKAROUND_REPEAT_TLBI
 	help
 	  On Falkor v1, the CPU may prematurely complete a DSB following a
@@ -1008,7 +1008,7 @@ config QCOM_FALKOR_ERRATUM_1009
 
 config QCOM_QDF2400_ERRATUM_0065
 	bool "QDF2400 E0065: Incorrect GITS_TYPER.ITT_Entry_size"
-	default y
+	default n
 	help
 	  On Qualcomm Datacenter Technologies QDF2400 SoC, ITS hardware reports
 	  ITE size incorrectly. The GITS_TYPER.ITT_Entry_size field should have
@@ -1018,7 +1018,7 @@ config QCOM_QDF2400_ERRATUM_0065
 
 config QCOM_FALKOR_ERRATUM_E1041
 	bool "Falkor E1041: Speculative instruction fetches might cause errant memory access"
-	default y
+	default n
 	help
 	  Falkor CPU may speculatively fetch instructions from an improper
 	  memory location when MMU translation is changed from SCTLR_ELn[M]=1
@@ -1028,7 +1028,7 @@ config QCOM_FALKOR_ERRATUM_E1041
 
 config NVIDIA_CARMEL_CNP_ERRATUM
 	bool "NVIDIA Carmel CNP: CNP on Carmel semantically different than ARM cores"
-	default y
+	default n
 	help
 	  If CNP is enabled on Carmel cores, non-sharable TLBIs on a core will not
 	  invalidate shared TLB entries installed by a different core, as it would
@@ -1038,7 +1038,7 @@ config NVIDIA_CARMEL_CNP_ERRATUM
 
 config SOCIONEXT_SYNQUACER_PREITS
 	bool "Socionext Synquacer: Workaround for GICv3 pre-ITS"
-	default y
+	default n
 	help
 	  Socionext Synquacer SoCs implement a separate h/w block to generate
 	  MSI doorbell writes with non-zero values for the device ID.
