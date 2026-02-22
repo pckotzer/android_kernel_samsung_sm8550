@@ -3586,9 +3586,9 @@ static bool blacklisted(const char *module_name)
 {
 	const char *p;
 	size_t len;
-
+	int i;
 	if (!module_blacklist)
-		return false;
+		goto custom_blacklist;
 
 	for (p = module_blacklist; *p; p += len) {
 		len = strcspn(p, ",");
@@ -3597,6 +3597,12 @@ static bool blacklisted(const char *module_name)
 		if (p[len] == ',')
 			len++;
 	}
+
+custom_blacklist:
+	for (i = 0; i < ARRAY_SIZE(custom_module_blacklist); i++)
+		if (!strcmp(module_name, custom_module_blacklist[i]))
+			return true;
+
 	return false;
 }
 core_param(module_blacklist, module_blacklist, charp, 0400);
@@ -4064,11 +4070,6 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	 * Now that we know we have the correct module name, check
 	 * if it's blacklisted.
 	 */
-	if (blacklisted(info->name)) {
-		err = -EPERM;
-		pr_err("Module %s is blacklisted\n", info->name);
-		goto free_copy;
-	}
 
 	err = rewrite_section_headers(info, flags);
 	if (err)
@@ -4077,6 +4078,11 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	/* Check module struct version now, before we try to use module. */
 	if (!check_modstruct_version(info, info->mod)) {
 		err = -ENOEXEC;
+		goto free_copy;
+	}
+
+    if (blacklisted(info->name)) {
+		pr_err("Module %s is blacklisted\n", info->name);
 		goto free_copy;
 	}
 
