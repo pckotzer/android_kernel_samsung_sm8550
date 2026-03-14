@@ -36,10 +36,6 @@ ifeq ($(CONFIG_BROKEN_GAS_INST),y)
 $(warning Detected assembler with broken .inst; disassembly will be unreliable)
 endif
 
-ifeq ($(shell test $(CONFIG_CLANG_VERSION) -gt 130000 2>/dev/null; echo $$?),0)
-KBUILD_CFLAGS	+= -mcpu=cortex-a510
-endif
-
 KBUILD_CFLAGS	+= -mgeneral-regs-only	\
 		   $(compat_vdso) $(cc_has_k_constraint)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, psabi)
@@ -102,11 +98,28 @@ ifeq ($(CONFIG_AS_HAS_ARMV8_5), y)
 asm-arch := armv8.5-a
 endif
 
-KBUILD_CFLAGS += $(call cc-option,-mcpu=cortex-a510+crypto+crc,-march=armv9-a+crc+crypto+fp16+simd+sve2+rdm+dotprod+nosve)
-KBUILD_CFLAGS += $(call cc-option,-mtune=neoverse-n1)
+# --- CPU/Arch specific Flags ---
+ARM64_CPU_FLAGS := cortex-a510+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+bf16
+ARM64_MARCH_FLAGS := armv9-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+bf16
+ARM64_TUNE_FLAGS := cortex-a510
+ARM64_OPT_FLAGS := -O2
 
+KBUILD_CFLAGS += $(call cc-option,-march=$(ARM64_MARCH_FLAGS),-mcpu=$(ARM64_CPU_FLAGS),$(ARM64_OPT_FLAGS))
+KBUILD_CFLAGS += $(call cc-option,-mtune=$(ARM64_TUNE_FLAGS))
+
+# Linker Flags (for LLD)
 ifeq ($(CONFIG_LD_IS_LLD), y)
-KBUILD_LDFLAGS  += -mllvm -march=armv9-a+crc+crypto+fp16+simd+sve2+rdm+dotprod+nosve -mcpu=cortex-a510
+LDFLAGS_LLD := -mllvm -march=$(ARM64_MARCH_FLAGS) -mcpu=$(ARM64_CPU_FLAGS) $(ARM64_OPT_FLAGS) 
+KBUILD_LDFLAGS += $(LDFLAGS_LLD)
+endif
+
+KBUILD_CFLAGS += $(call cc-option,-march=$(ARM64_MARCH_FLAGS),-mcpu=$(ARM64_CPU_FLAGS),$(ARM64_OPT_FLAGS))
+KBUILD_CFLAGS += $(call cc-option,-mtune=$(ARM64_TUNE_FLAGS))
+
+# Linker Flags (für LLD)
+ifeq ($(CONFIG_LD_IS_LLD), y)
+LDFLAGS_LLD := -mllvm -march=$(ARM64_MARCH_FLAGS) -mcpu=$(ARM64_CPU_FLAGS) $(ARM64_OPT_FLAGS) 
+KBUILD_LDFLAGS += $(LDFLAGS_LLD)
 endif
 
 ifeq ($(CONFIG_SHADOW_CALL_STACK), y)
