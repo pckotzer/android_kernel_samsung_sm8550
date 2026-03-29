@@ -826,9 +826,9 @@ KBUILD_CFLAGS	+= -mllvm -polly-loopfusion-greedy=1 \
 		   -mllvm -polly-num-threads=0 \
 		   -mllvm -polly-omp-backend=LLVM \
 		   -mllvm -polly-scheduling=dynamic \
-		   -mllvm -polly-scheduling-chunksize=1
+		   -mllvm -polly-scheduling-chunksize=16
 else
-KBUILD_CFLAGS	+= -mllvm -polly-opt-fusion=max
+KBUILD_CFLAGS	+= -mllvm -polly-opt-fusion=max -mllvm -polly-tiling -mllvm -polly-loopfusion-scheduling 
 endif
 
 # Polly may optimise loops with dead paths beyound what the linker
