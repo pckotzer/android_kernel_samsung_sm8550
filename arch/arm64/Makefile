@@ -122,14 +122,14 @@ endif
 ARM64_CPU_FLAGS := cotrex-a710+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+nosve
 ARM64_MARCH_FLAGS := armv9.2-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm
 ARM64_TUNE_FLAGS := neoverse-n2
-ARM64_OPT_FLAGS := -O3 -fvectorize -fslp-vectorize -ffunction-sections -fdata-sections
+ARM64_OPT_FLAGS := -O2 -fvectorize -fslp-vectorize -ffunction-sections -fdata-sections
 
 # Einzelne Checks für Stabilität
 KBUILD_CFLAGS += $(call cc-option,-march=$(ARM64_MARCH_FLAGS))
 KBUILD_CFLAGS += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
 KBUILD_CFLAGS += $(call cc-option,-mtune=$(ARM64_TUNE_FLAGS))
 KBUILD_CFLAGS += $(ARM64_OPT_FLAGS)
-#KBUILD_CFLAGS += $(call cc-option,-falign-functions=64)
+KBUILD_CFLAGS += $(call cc-option,-falign-functions=32)
 
 # Linker Flags (für LLD)
 ifeq ($(CONFIG_LD_IS_LLD), y)
