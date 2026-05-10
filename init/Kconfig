@@ -118,7 +118,7 @@ menu "General setup"
 
 config ZEN_INTERACTIVE
 	bool "Tune kernel for interactivity"
-	default n
+	default y
 	help
 	  Tunes the kernel for responsiveness at the cost of throughput and power usage.
 

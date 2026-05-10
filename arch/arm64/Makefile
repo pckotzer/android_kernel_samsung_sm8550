@@ -10,14 +10,34 @@
 #
 # Copyright (C) 1995-2001 by Russell King
 
-LDFLAGS_vmlinux	:=--no-undefined -X --pic-veneer --lto-O3
+LDFLAGS_vmlinux	:=--no-undefined -X --pic-veneer -pie --lto-O3
 
 ifeq ($(CONFIG_RELOCATABLE), y)
 # Pass --no-apply-dynamic-relocs to restore pre-binutils-2.27 behaviour
 # for relative relocs, since this leads to better Image compression
 # with the relocation offsets always being zero.
-LDFLAGS_vmlinux		+= -shared -Bsymbolic -z notext \
+LDFLAGS_vmlinux		+= -Bsymbolic -z notext \
 			$(call ld-option, --no-apply-dynamic-relocs)
+
+			# Pass -shared for bfd and -pie for lld to minimize Image size on both
+ 
+
+ifeq ($(ld-name),bfd)
+ 
+
+LDFLAGS_vmlinux		+= -shared
+ 
+
+endif
+ 
+
+ifeq ($(ld-name),lld)
+ 
+
+LDFLAGS_vmlinux		+= -pie
+ 
+
+endif
 endif
 
 ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
@@ -98,27 +118,23 @@ ifeq ($(CONFIG_AS_HAS_ARMV8_5), y)
 asm-arch := armv8.5-a
 endif
 
-# --- CPU/Arch specific Flags ---
-ARM64_CPU_FLAGS := cortex-a510+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+bf16
-ARM64_MARCH_FLAGS := armv9-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+bf16
-ARM64_TUNE_FLAGS := cortex-a510
-ARM64_OPT_FLAGS := -O2
+# --- CPU/Arch spezifische Flags (Optimiert) ---
+ARM64_CPU_FLAGS := cotrex-a710+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+nosve
+ARM64_MARCH_FLAGS := armv9.2-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm
+ARM64_TUNE_FLAGS := neoverse-n2
+ARM64_OPT_FLAGS := -O3 -fvectorize -fslp-vectorize -ffunction-sections -fdata-sections
 
-KBUILD_CFLAGS += $(call cc-option,-march=$(ARM64_MARCH_FLAGS),-mcpu=$(ARM64_CPU_FLAGS),$(ARM64_OPT_FLAGS))
+# Einzelne Checks für Stabilität
+KBUILD_CFLAGS += $(call cc-option,-march=$(ARM64_MARCH_FLAGS))
+KBUILD_CFLAGS += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
 KBUILD_CFLAGS += $(call cc-option,-mtune=$(ARM64_TUNE_FLAGS))
-
-# Linker Flags (for LLD)
-ifeq ($(CONFIG_LD_IS_LLD), y)
-LDFLAGS_LLD := -mllvm -march=$(ARM64_MARCH_FLAGS) -mcpu=$(ARM64_CPU_FLAGS) $(ARM64_OPT_FLAGS) 
-KBUILD_LDFLAGS += $(LDFLAGS_LLD)
-endif
-
-KBUILD_CFLAGS += $(call cc-option,-march=$(ARM64_MARCH_FLAGS),-mcpu=$(ARM64_CPU_FLAGS),$(ARM64_OPT_FLAGS))
-KBUILD_CFLAGS += $(call cc-option,-mtune=$(ARM64_TUNE_FLAGS))
+KBUILD_CFLAGS += $(ARM64_OPT_FLAGS)
+#KBUILD_CFLAGS += $(call cc-option,-falign-functions=64)
 
 # Linker Flags (für LLD)
 ifeq ($(CONFIG_LD_IS_LLD), y)
-LDFLAGS_LLD := -mllvm -march=$(ARM64_MARCH_FLAGS) -mcpu=$(ARM64_CPU_FLAGS) $(ARM64_OPT_FLAGS) 
+# Füge --gc-sections hinzu, um ungenutzten Code zu entfernen
+LDFLAGS_LLD := -mllvm -march=$(ARM64_MARCH_FLAGS) -mllvm -polly-run-dce
 KBUILD_LDFLAGS += $(LDFLAGS_LLD)
 endif
 

@@ -23,6 +23,9 @@
 #include <linux/thermal.h>
 #include "power_supply.h"
 
+/* External WALT API - marked as weak to prevent linker errors */
+extern void __attribute__((weak)) walt_update_charging_status(int charging);
+
 /* exported for the APM Power driver, APM emulation */
 struct class *power_supply_class;
 EXPORT_SYMBOL_GPL(power_supply_class);
@@ -127,6 +130,9 @@ void power_supply_changed(struct power_supply *psy)
 	spin_lock_irqsave(&psy->changed_lock, flags);
 	psy->changed = true;
 	pm_stay_awake(&psy->dev);
+	/* Trigger WALT governor charging state update if symbol is available */
+	if (walt_update_charging_status)
+		walt_update_charging_status(power_supply_is_system_supplied());
 	spin_unlock_irqrestore(&psy->changed_lock, flags);
 	schedule_work(&psy->changed_work);
 }
