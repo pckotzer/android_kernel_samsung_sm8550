@@ -516,15 +516,9 @@ static int max77705_fg_read_soc(struct max77705_fuelgauge_data *fuelgauge)
 		pr_err("%s: Failed to read SOCREP_REG\n", __func__);
 		return -1;
 	}
-
-	/* Formula: Convert raw register data to 0.1% units */
 	soc = ((data[1] * 100) + (data[0] * 100 / 256)) / 10;
-
-	/* * CRITICAL HOOK: 
-	 * We divide by 10 to send a 0-100 integer to WALT.
-	 */
 	walt_update_battery_level(soc / 10);
-
+	
 #ifdef BATTERY_LOG_MESSAGE
 	pr_debug("%s: raw capacity (%d)\n", __func__, soc);
 
