@@ -877,13 +877,11 @@ static u8 spectre_bhb_loop_affected(void)
 	u8 k = 0;
 
 	static const struct midr_range spectre_bhb_k132_list[] = {
-		MIDR_ALL_VERSIONS(MIDR_CORTEX_X3),
-		MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V2),
+		MIDR_ALL_VERSIONS(MIDR_HISI_TSV110),
 		{},
 	};
 	static const struct midr_range spectre_bhb_k38_list[] = {
-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A715),
-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A720),
+		MIDR_ALL_VERSIONS(MIDR_HISI_TSV110),
 		{},
 	};
 	static const struct midr_range spectre_bhb_k32_list[] = {
@@ -892,10 +890,7 @@ static u8 spectre_bhb_loop_affected(void)
 		MIDR_ALL_VERSIONS(MIDR_CORTEX_A78C),
 		MIDR_ALL_VERSIONS(MIDR_CORTEX_X1),
 		MIDR_ALL_VERSIONS(MIDR_CORTEX_X1C),
-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A710),
 		MIDR_ALL_VERSIONS(MIDR_CORTEX_X2),
-		MIDR_ALL_VERSIONS(MIDR_NEOVERSE_N2),
-		MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V1),
 		MIDR_ALL_VERSIONS(MIDR_HISI_TSV110),
 		{},
 	};
