@@ -622,7 +622,7 @@ void *kvmalloc_node(size_t size, gfp_t flags, int node)
 		kmalloc_flags |= __GFP_NOWARN;
 
 		if (!(kmalloc_flags & __GFP_RETRY_MAYFAIL))
-			kmalloc_flags |= __GFP_NORETRY;
+			kmalloc_flags &= ~__GFP_DIRECT_RECLAIM;
 	}
 
 	ret = kmalloc_node(size, kmalloc_flags, node);
