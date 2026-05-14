@@ -637,11 +637,8 @@ static struct elevator_type *elevator_get_default(struct request_queue *q)
 	if (q->nr_hw_queues != 1 &&
 			!blk_mq_is_sbitmap_shared(q->tag_set->flags))
 		return NULL;
-#ifdef CONFIG_MQ_IOSCHED_DEFAULT_ADIOS
-	return elevator_find_get(q, "adios");
-#else // !CONFIG_MQ_IOSCHED_DEFAULT_ADIOS
+
 	return elevator_get(q, "kyber", false);
-#endif // !CONFIG_MQ_IOSCHED_DEFAULT_ADIOS
 }
 
 /*
