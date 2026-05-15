@@ -256,7 +256,6 @@ static int set_prot_mask(struct ashmem_area *asma, unsigned long prot)
 static long ashmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct ashmem_area *asma = file->private_data;
-
 	switch (cmd) {
 	case ASHMEM_SET_NAME:
 		return 0;
@@ -282,6 +281,7 @@ static long ashmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		return ASHMEM_IS_PINNED;
 	case ASHMEM_PURGE_ALL_CACHES:
 		return capable(CAP_SYS_ADMIN) ? 0 : -EPERM;
+
 	}
 
 	return -ENOTTY;
