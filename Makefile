@@ -1,11 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 VERSION = 5
 PATCHLEVEL = 15
-<<<<<<< HEAD
-SUBLEVEL = 178
-=======
-SUBLEVEL = 202
->>>>>>> 119c35f4616f (Merge remote-tracking branch 'lineage-23.2/lineage-23.2' into 16-dev2)
+SUBLEVEL = 206
 EXTRAVERSION =
 NAME = Trick or Treat
 
