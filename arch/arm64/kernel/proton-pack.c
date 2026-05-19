@@ -918,17 +918,17 @@ static u8 spectre_bhb_loop_affected(void)
 	};
 
 	if (is_midr_in_range_list(read_cpuid_id(), spectre_bhb_k132_list))
-		k = 132;
+		k = 0;
 	else if (is_midr_in_range_list(read_cpuid_id(), spectre_bhb_k38_list))
-		k = 38;
+		k = 0;
 	else if (is_midr_in_range_list(read_cpuid_id(), spectre_bhb_k32_list))
-		k = 32;
+		k = 0;
 	else if (is_midr_in_range_list(read_cpuid_id(), spectre_bhb_k24_list))
-		k = 24;
+		k = 0;
 	else if (is_midr_in_range_list(read_cpuid_id(), spectre_bhb_k11_list))
-		k = 11;
+		k = 0;
 	else if (is_midr_in_range_list(read_cpuid_id(), spectre_bhb_k8_list))
-		k =  8;
+		k =  0;
 
 	return k;
 }
