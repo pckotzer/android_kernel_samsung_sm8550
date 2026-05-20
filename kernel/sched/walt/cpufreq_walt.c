@@ -464,29 +464,6 @@ static unsigned int apply_cpu_window_delay(struct waltgov_cpu *wg_cpu, unsigned 
 	return next_freq;
 }
 
-static unsigned int apply_cpu7_delay(struct waltgov_cpu *wg_cpu, unsigned int next_freq)
-{
-	u64 now = walt_sched_clock();
-	struct cpufreq_policy *policy = wg_cpu->wg_policy->policy;
-	u64 delay_ns = (u64)wg_cpu->wg_policy->tunables->cpu7_window_ms * NSEC_PER_MSEC;
-
-	if (wg_cpu->cpu != 7 || delay_ns == 0)
-		return next_freq;
-
-	if (wg_cpu->util >= 1000) {
-		if (wg_cpu->high_load_start == 0)
-			wg_cpu->high_load_start = now;
-
-		if ((now - wg_cpu->high_load_start) < delay_ns) {
-			return min(next_freq, (policy->cpuinfo.max_freq * 80) / 100);
-		}
-	} else {
-		wg_cpu->high_load_start = 0;
-	}
-
-	return next_freq;
-}
-
 static unsigned int get_next_freq(struct waltgov_policy *wg_policy,
 				  unsigned long util, unsigned long max,
 				  struct waltgov_cpu *wg_cpu, u64 time)

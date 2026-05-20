@@ -129,7 +129,7 @@ KBUILD_CFLAGS += $(call cc-option,-march=$(ARM64_MARCH_FLAGS))
 KBUILD_CFLAGS += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
 KBUILD_CFLAGS += $(call cc-option,-mtune=$(ARM64_TUNE_FLAGS))
 KBUILD_CFLAGS += $(ARM64_OPT_FLAGS)
-KBUILD_CFLAGS += $(call cc-option,-falign-functions=64)
+#KBUILD_CFLAGS += $(call cc-option,-falign-functions=64)
 
 # Linker Flags (für LLD)
 ifeq ($(CONFIG_LD_IS_LLD), y)
