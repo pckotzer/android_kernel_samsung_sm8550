@@ -73,7 +73,7 @@ CONFIG_SETEND_EMULATION=y
 CONFIG_ARM64_MPAM=y
 CONFIG_RANDOMIZE_BASE=y
 # CONFIG_RANDOMIZE_MODULE_REGION_FULL is not set
-CONFIG_CMDLINE="mitigations=off cpu_mitigations_off nospectre_bhb force-off stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protected cgroup_disable=pressure noirqdebug debug=0 nowatchdog nmi_watchdog=0 no_debug_objects dyndbg=0 module.dyndbg=0"
+CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protected cgroup_disable=pressure noirqdebug debug=0 nowatchdog nmi_watchdog=0 no_debug_objects dyndbg=0 module.dyndbg=0"
 CONFIG_CMDLINE_EXTEND=y
 # CONFIG_DMI is not set
 CONFIG_AIO=y
@@ -111,8 +111,8 @@ CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
 CONFIG_KPROBES=y
 CONFIG_JUMP_LABEL=y
 CONFIG_SHADOW_CALL_STACK=y
-CONFIG_LTO_CLANG_THIN=y
-CONFIG_LTO_CLANG_FULL=n
+CONFIG_LTO_CLANG_THIN=n
+CONFIG_LTO_CLANG_FULL=y
 CONFIG_LTO_CLANG=y
 CONFIG_CFI_CLANG=y
 CONFIG_LLVM_POLLY=y
