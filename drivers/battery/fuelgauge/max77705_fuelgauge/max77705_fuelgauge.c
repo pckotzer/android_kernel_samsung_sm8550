@@ -514,7 +514,8 @@ static int max77705_fg_read_soc(struct max77705_fuelgauge_data *fuelgauge)
 		return -1;
 	}
 	soc = ((data[1] * 100) + (data[0] * 100 / 256)) / 10;
-
+	walt_update_battery_level(soc / 10);
+	
 #ifdef BATTERY_LOG_MESSAGE
 	pr_debug("%s: raw capacity (%d)\n", __func__, soc);
 
