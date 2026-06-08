@@ -816,74 +816,8 @@ endif
 # ==============================================================================
 # ARCHITEKTUR & OPTIMIERUNGS-BASIS (SM8550 Snapdragon 8 Gen 2)
 # ==============================================================================
-ARM64_CPU_FLAGS   := cortex-a710+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+nosve
-ARM64_MARCH_FLAGS := armv9-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm
-ARM64_OPT_FLAGS   := -O3 -fvectorize -fslp-vectorize -ffunction-sections -fdata-sections
 
-KBUILD_CFLAGS     += $(call cc-option,-march=$(ARM64_MARCH_FLAGS))
-KBUILD_CFLAGS     += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
-KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-a710)
-KBUILD_CFLAGS     += $(ARM64_OPT_FLAGS)
-KBUILD_CFLAGS     += -g0
-KBUILD_CFLAGS     += $(call cc-option,-fuse-ld=lld)
-KBUILD_CFLAGS     += $(call cc-disable-warning,maybe-uninitialized)
 
-# Ausrichtung auf 16-Byte Grenzen: Sweetspot für ARM64 Instruction Fetcher
-KBUILD_CFLAGS     += $(call cc-option,-falign-functions=16)
-KBUILD_CFLAGS     += $(call cc-option,-falign-loops=16)
-
-# ==============================================================================
-# 1. RADIKALES FULL-UNROLLING & HIGH-SPEED VEKTORISIERUNG (NEON)
-# ==============================================================================
-KBUILD_CFLAGS     += -Xclang -vectorize-loops
-KBUILD_CFLAGS     += -Xclang -vectorize-slp
-KBUILD_CFLAGS     += -mllvm --enable-epilogue-vectorization
-KBUILD_CFLAGS     += -mllvm --enable-interleaved-mem-accesses
-KBUILD_CFLAGS     += -mllvm -force-vector-interleave=4
-
-# Das bereinigte "Krasse" Unrolling-Paket
-KBUILD_CFLAGS     += $(call cc-option,-funroll-loops)
-KBUILD_CFLAGS     += -mllvm -unroll-threshold=1500
-KBUILD_CFLAGS     += -mllvm --unroll-runtime=true
-KBUILD_CFLAGS     += -mllvm -unroll-max-count=16
-KBUILD_CFLAGS     += $(call cc-option,-floop-unroll-and-jam)
-KBUILD_CFLAGS     += $(call cc-option,-fpeel-loops)
-KBUILD_CFLAGS     += $(call cc-option,-fprefetch-loop-arrays)
-KBUILD_CFLAGS     += -mllvm --enable-loop-flatten
-KBUILD_CFLAGS     += $(call cc-option,-floop-fusion)
-
-# ==============================================================================
-# 2. INTERNE PIPELINE-ENTLASTUNG & ALLOKATION (Syscall & Memory Boost)
-# ==============================================================================
-KBUILD_CFLAGS     += $(call cc-option,-fstrict-aliasing)
-KBUILD_CFLAGS     += $(call cc-option,-fstrict-enums)
-KBUILD_CFLAGS     += $(call cc-option,-fno-semantic-interposition)
-KBUILD_CFLAGS     += $(call cc-option,-fno-signed-zeros)
-KBUILD_CFLAGS     += $(call cc-option,-ffp-contract=fast)
-KBUILD_CFLAGS     += $(call cc-option,-fno-trapping-math)
-KBUILD_CFLAGS     += $(call cc-option,-fassociative-math)
-KBUILD_CFLAGS     += $(call cc-option,-frename-registers)
-
-# Modernes Code-Layout zur massiven Senkung von Branch-Predictor-Fehlern
-KBUILD_CFLAGS     += -mllvm --enable-ext-tsp-block-placement
-KBUILD_CFLAGS     += -mllvm --enable-dse-partial-store-merging
-
-# ==============================================================================
-# 3. AARCH64 PIPELINE-SCHEDULING (Cortex-X3 Core Tuning)
-# ==============================================================================
-KBUILD_CFLAGS     += -mllvm -aarch64-enable-ldst-opt
-KBUILD_CFLAGS     += -mllvm -aarch64-enable-ccmp
-KBUILD_CFLAGS     += -mllvm -aarch64-early-ifcvt
-KBUILD_CFLAGS     += -mllvm -enable-misched
-KBUILD_CFLAGS     += -mllvm -enable-post-misched
-
-# ==============================================================================
-# 4. MAXIMUM INLINING & RUNTIME CHECKS (Syscall Latenz Killer)
-# ==============================================================================
-KBUILD_CFLAGS     += -mllvm -inline-threshold=600
-KBUILD_CFLAGS     += -mllvm -inlinehint-threshold=600
-KBUILD_CFLAGS     += -mllvm -enable-loop-distribute
-KBUILD_CFLAGS     += -mllvm -runtime-memory-check-threshold=12
 
 # ==============================================================================
 # 5. POLLY INTEGRATION (Mit deaktivertem Polly-Vektorisierer = Sicher & Schnell)
