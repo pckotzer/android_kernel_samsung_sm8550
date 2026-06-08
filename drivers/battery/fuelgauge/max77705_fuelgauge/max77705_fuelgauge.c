@@ -29,6 +29,9 @@
 #define EXPORT_SYMBOL_KUNIT(sym)	/* nothing */
 #endif
 
+/* Added for WALT battery level integration */
+extern void walt_update_battery_level(int level);
+
 static unsigned int __read_mostly lpcharge;
 module_param(lpcharge, uint, 0444);
 

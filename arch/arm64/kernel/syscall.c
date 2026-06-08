@@ -78,7 +78,7 @@ static inline bool has_syscall_work(unsigned long flags)
 int syscall_trace_enter(struct pt_regs *regs);
 void syscall_trace_exit(struct pt_regs *regs);
 
-static void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
+static __always_inline void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr, 
 			   const syscall_fn_t syscall_table[])
 {
 	unsigned long flags = current_thread_info()->flags;

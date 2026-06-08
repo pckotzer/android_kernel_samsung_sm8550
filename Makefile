@@ -813,33 +813,87 @@ else ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS += -Os
 endif
 
-ifdef CONFIG_LLVM_POLLY
-KBUILD_CFLAGS	+= -mllvm -polly \
-		   -mllvm -polly-run-inliner \
-		   -mllvm -polly-ast-use-context \
-		   -mllvm -polly-detect-keep-going \
-		   -mllvm -polly-invariant-load-hoisting \
-		   -mllvm -polly-vectorizer=stripmine
+# ==============================================================================
+# ARCHITEKTUR & OPTIMIERUNGS-BASIS (SM8550 Snapdragon 8 Gen 2)
+# ==============================================================================
+ARM64_CPU_FLAGS   := cortex-a710+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+nosve
+ARM64_MARCH_FLAGS := armv9-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm
+ARM64_OPT_FLAGS   := -O3 -fvectorize -fslp-vectorize -ffunction-sections -fdata-sections
 
-ifeq ($(shell test $(CONFIG_CLANG_VERSION) -gt 130000; echo $$?),0)
-KBUILD_CFLAGS	+= -mllvm -polly-loopfusion-greedy=1 \
-		   -mllvm -polly-reschedule=1 \
-		   -mllvm -polly-postopts=1 \
-		   -mllvm -polly-num-threads=0 \
-		   -mllvm -polly-omp-backend=LLVM \
-		   -mllvm -polly-scheduling=dynamic \
-		   -mllvm -polly-scheduling-chunksize=16
-else
-KBUILD_CFLAGS	+= -mllvm -polly-opt-fusion=max -mllvm -polly-tiling -mllvm -polly-loopfusion-scheduling 
-endif
+KBUILD_CFLAGS     += $(call cc-option,-march=$(ARM64_MARCH_FLAGS))
+KBUILD_CFLAGS     += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
+KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-a710)
+KBUILD_CFLAGS     += $(ARM64_OPT_FLAGS)
+KBUILD_CFLAGS     += -g0
+KBUILD_CFLAGS     += $(call cc-option,-fuse-ld=lld)
+KBUILD_CFLAGS     += $(call cc-disable-warning,maybe-uninitialized)
 
+# Ausrichtung auf 16-Byte Grenzen: Sweetspot für ARM64 Instruction Fetcher
+KBUILD_CFLAGS     += $(call cc-option,-falign-functions=16)
+KBUILD_CFLAGS     += $(call cc-option,-falign-loops=16)
+
+# ==============================================================================
+# 1. RADIKALES FULL-UNROLLING & HIGH-SPEED VEKTORISIERUNG (NEON)
+# ==============================================================================
+KBUILD_CFLAGS     += -Xclang -vectorize-loops
+KBUILD_CFLAGS     += -Xclang -vectorize-slp
+KBUILD_CFLAGS     += -mllvm --enable-epilogue-vectorization
+KBUILD_CFLAGS     += -mllvm --enable-interleaved-mem-accesses
+KBUILD_CFLAGS     += -mllvm -force-vector-interleave=4
+
+# Das bereinigte "Krasse" Unrolling-Paket
+KBUILD_CFLAGS     += $(call cc-option,-funroll-loops)
+KBUILD_CFLAGS     += -mllvm -unroll-threshold=1500
+KBUILD_CFLAGS     += -mllvm --unroll-runtime=true
+KBUILD_CFLAGS     += -mllvm -unroll-max-count=16
+KBUILD_CFLAGS     += $(call cc-option,-floop-unroll-and-jam)
+KBUILD_CFLAGS     += $(call cc-option,-fpeel-loops)
+KBUILD_CFLAGS     += $(call cc-option,-fprefetch-loop-arrays)
+KBUILD_CFLAGS     += -mllvm --enable-loop-flatten
+KBUILD_CFLAGS     += $(call cc-option,-floop-fusion)
+
+# ==============================================================================
+# 2. INTERNE PIPELINE-ENTLASTUNG & ALLOKATION (Syscall & Memory Boost)
+# ==============================================================================
+KBUILD_CFLAGS     += $(call cc-option,-fstrict-aliasing)
+KBUILD_CFLAGS     += $(call cc-option,-fstrict-enums)
+KBUILD_CFLAGS     += $(call cc-option,-fno-semantic-interposition)
+KBUILD_CFLAGS     += $(call cc-option,-fno-signed-zeros)
+KBUILD_CFLAGS     += $(call cc-option,-ffp-contract=fast)
+KBUILD_CFLAGS     += $(call cc-option,-fno-trapping-math)
+KBUILD_CFLAGS     += $(call cc-option,-fassociative-math)
+KBUILD_CFLAGS     += $(call cc-option,-frename-registers)
+
+# Modernes Code-Layout zur massiven Senkung von Branch-Predictor-Fehlern
+KBUILD_CFLAGS     += -mllvm --enable-ext-tsp-block-placement
+KBUILD_CFLAGS     += -mllvm --enable-dse-partial-store-merging
+
+# ==============================================================================
+# 3. AARCH64 PIPELINE-SCHEDULING (Cortex-X3 Core Tuning)
+# ==============================================================================
+KBUILD_CFLAGS     += -mllvm -aarch64-enable-ldst-opt
+KBUILD_CFLAGS     += -mllvm -aarch64-enable-ccmp
+KBUILD_CFLAGS     += -mllvm -aarch64-early-ifcvt
+KBUILD_CFLAGS     += -mllvm -enable-misched
+KBUILD_CFLAGS     += -mllvm -enable-post-misched
+
+# ==============================================================================
+# 4. MAXIMUM INLINING & RUNTIME CHECKS (Syscall Latenz Killer)
+# ==============================================================================
+KBUILD_CFLAGS     += -mllvm -inline-threshold=600
+KBUILD_CFLAGS     += -mllvm -inlinehint-threshold=600
+KBUILD_CFLAGS     += -mllvm -enable-loop-distribute
+KBUILD_CFLAGS     += -mllvm -runtime-memory-check-threshold=12
+
+# ==============================================================================
+# 5. POLLY INTEGRATION (Mit deaktivertem Polly-Vektorisierer = Sicher & Schnell)
+# ==============================================================================
 # Polly may optimise loops with dead paths beyound what the linker
 # can understand. This may negate the effect of the linker's DCE
 # so we tell Polly to perfom proven DCE on the loops it optimises
 # in order to preserve the overall effect of the linker's DCE.
 ifdef CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 POLLY_FLAGS	+= -mllvm -polly-run-dce
-endif
 endif
 
 # Tell gcc to never replace conditional load with a non-conditional one
@@ -1087,8 +1141,46 @@ export CC_FLAGS_CFI
 endif
 
 ifneq ($(CONFIG_FUNCTION_ALIGNMENT),0)
-KBUILD_CFLAGS += -falign-functions=$(CONFIG_FUNCTION_ALIGNMENT)
+KBUILD_CFLAGS += -falign-functions=16
 endif
+#KBUILD_CFLAGS   += $(call cc-option,-falign-functions=16)
+KBUILD_CFLAGS   += $(call cc-option,-falign-loops=16)
+
+# Befreit das Frame-Pointer-Register für mehr Leistung
+KBUILD_CFLAGS   += $(call cc-option,-fomit-frame-pointer)
+
+# Erlaubt moderates, partielles Schleifen-Unrolling (Vorsichtig testen!)
+#KBUILD_CFLAGS   += $(call cc-option,-mllvm -unroll-allow-partial)
+
+# Global Value Numbering für schlankeren Code (Vorsichtig testen!)
+#KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-hoist)
+KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-sink)
+
+# Linker Flags (für LLD)
+ifeq ($(CONFIG_LD_IS_LLD), y)
+# Füge --gc-sections hinzu, um ungenutzten Code zu entfernen
+LDFLAGS_LLD := -mllvm -march=$(ARM64_MARCH_FLAGS) -mllvm -polly-run-dce \
+                   -mllvm -polly-run-inliner \
+                   -mllvm -polly-loopfusion-greedy=1 \
+                   -mllvm -polly-tiling \
+                   -mllvm -polly-tile-sizes=16,32 \
+                   -mllvm -polly-run-dce \
+                   -mllvm --enable-ext-tsp-block-placement \
+                   -mllvm --enable-epilogue-vectorization \
+                   -mllvm -inlinehint-threshold=600
+KBUILD_LDFLAGS += $(LDFLAGS_LLD)
+endif
+
+# Verwende den modernen Linker (schnellerer Build, sauberer Code)
+KBUILD_CFLAGS   += $(call cc-option,-fuse-ld=lld)
+
+# Debug-Müll entfernen (spart Platz und Overhead)
+KBUILD_CFLAGS   += -g0
+
+# Sichere Schleifenoptimierung (ohne unroll-and-jam)
+#KBUILD_CFLAGS   += $(call cc-option,-ftree-vectorize)
+
+# Keine semantische Interposition (erlaubt bessere Inlining-Entscheidungen im Kernel)htig testen!)
 
 # arch Makefile may override CC so keep this after arch Makefile is included
 NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)
