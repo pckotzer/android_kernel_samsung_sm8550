@@ -1541,7 +1541,7 @@ static int waltgov_init(struct cpufreq_policy *policy)
 	tunables->cpu0_eff_limit = 1901000;
 	tunables->cpu3_eff_limit = 2150400;
 	tunables->cpu7_eff_limit = 2123000;
-	tunables->cpu0_volt_margin_pct = 80;
+	tunables->cpu0_volt_margin_pct = 50; // 80
 	tunables->cpu3_volt_margin_pct = 28;
 	tunables->cpu7_volt_margin_pct = 35;
 	/* Set Temperature Selection Defaults */
