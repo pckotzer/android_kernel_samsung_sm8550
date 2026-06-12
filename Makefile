@@ -817,21 +817,49 @@ endif
 # ARCHITEKTUR & OPTIMIERUNGS-BASIS (SM8550 Snapdragon 8 Gen 2)
 # ==============================================================================
 ARM64_CPU_FLAGS   := cortex-a710+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+nosve
-ARM64_MARCH_FLAGS := armv9-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm
-ARM64_OPT_FLAGS   := -O3 -fvectorize -fslp-vectorize -ffunction-sections -fdata-sections
+ARM64_MARCH_FLAGS := armv9.2-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm
+ARM64_OPT_FLAGS   := -O2 -ffunction-sections -fdata-sections
 
 KBUILD_CFLAGS     += $(call cc-option,-march=$(ARM64_MARCH_FLAGS))
 KBUILD_CFLAGS     += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
-KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-a510)
+KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-x3)
 KBUILD_CFLAGS     += $(ARM64_OPT_FLAGS)
 
 # Ausrichtung auf 16-Byte Grenzen: Sweetspot für ARM64 Instruction Fetcher
 KBUILD_CFLAGS     += $(call cc-option,-falign-functions=16)
-KBUILD_CFLAGS     += $(call cc-option,-falign-loops=16)
+#KBUILD_CFLAGS     += $(call cc-option,-falign-loops=16)
 KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-hoist)
 KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-sink)
-
-
+KBUILD_CFLAGS += -Xclang -vectorize-loops
+KBUILD_CFLAGS += -Xclang -vectorize-slp
+#KBUILD_CFLAGS += -mllvm --enable-epilogue-vectorization
+KBUILD_CFLAGS += -fno-signed-zeros
+KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
+KBUILD_CFLAGS += -mllvm --enable-dse-partial-store-merging
+KBUILD_CFLAGS += -mllvm --enable-epilogue-vectorization
+# Keine semantische Interposition (erlaubt bessere Inlining-Entscheidungen im Kernel)
+KBUILD_CFLAGS   += $(call cc-option,-fno-semantic-interposition)
+KBUILD_CFLAGS   += $(call cc-option,-frename-registers)
+KBUILD_CFLAGS   += $(call cc-option,-fno-signed-zeros)
+KBUILD_CFLAGS   += $(call cc-option,-fsched-interblock)
+KBUILD_CFLAGS   += $(call cc-option,-fgcse-after-reload)
+KBUILD_CFLAGS   += $(call cc-option,-fuse-ld=lld)
+KBUILD_CFLAGS   += $(call cc-disable-warning,maybe-uninitialized)
+KBUILD_CFLAGS   += -ffp-contract=fast -g0
+KBUILD_CFLAGS += $(call cc-option,-floop-unroll-and-jam)
+KBUILD_CFLAGS += $(call cc-option,-fpeel-loops)
+KBUILD_CFLAGS += $(call cc-option,-fprefetch-loop-arrays)
+KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
+KBUILD_CFLAGS += -mllvm --enable-interleaved-mem-accesses
+KBUILD_CFLAGS += -mllvm --enable-loop-flatten
+KBUILD_CFLAGS += -mllvm --enable-dse-partial-store-merging
+KBUILD_CFLAGS += -mllvm --enable-epilogue-vectorization
+KBUILD_CFLAGS += $(call cc-option,-fno-semantic-interposition)
+KBUILD_CFLAGS += $(call cc-option,-fno-math-errno)
+KBUILD_CFLAGS += $(call cc-option,-fschedule-insns2)
+KBUILD_CFLAGS += -mllvm -aarch64-enable-ldst-opt
+KBUILD_CFLAGS += -mllvm -aarch64-enable-ccmp
+KBUILD_CFLAGS += -mllvm -aarch64-early-ifcvt
 # ==============================================================================
 # 5. POLLY INTEGRATION (Mit deaktivertem Polly-Vektorisierer = Sicher & Schnell)
 # ==============================================================================
