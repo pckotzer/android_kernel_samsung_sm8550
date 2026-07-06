@@ -1537,7 +1537,7 @@ static int waltgov_init(struct cpufreq_policy *policy)
 	tunables->target_load_thresh = DEFAULT_TARGET_LOAD_THRESH;
 	tunables->target_load_shift = DEFAULT_TARGET_LOAD_SHIFT;
 	tunables->cpu7_window_ms = 0;
-	tunables->cpu3_window_ms = 0;
+	tunables->cpu3_window_ms = 300;
 	tunables->cpu0_eff_limit = 1901000;
 	tunables->cpu3_eff_limit = 2150400;
 	tunables->cpu7_eff_limit = 2123000;
@@ -1554,7 +1554,7 @@ static int waltgov_init(struct cpufreq_policy *policy)
 	tunables->cpu7temp_58 = 2254400;
 	tunables->cpu7temp_61 = 1800000;
 	tunables->cpu7temp_62 = 1500000;
-	tunables->cpu7temp_63 = 9980000;
+	tunables->cpu7temp_63 = 998000;
 	tunables->cpu7temp_70 = 556400;
 
 	tunables->cpu0bat_100 = 9999999;
