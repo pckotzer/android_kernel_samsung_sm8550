@@ -111,7 +111,7 @@ static int tsens_get_temp_and_push_walt(const struct tsens_sensor *s, int *temp)
         /* * Target gpuss-1 (Index 14).
         * If pointer matches index 14, push value to governor.
         */
-       if (!ret && temp && s == &priv->sensor[14]) {
+       if (!ret && temp && s == &priv->sensor[34]) {
                walt_update_thermal_temp(*temp);
        }
 
