@@ -3582,7 +3582,7 @@ static void mfc_wpc_rx_type_det_work(struct work_struct *work)
 	struct mfc_charger_data *charger =
 		container_of(work, struct mfc_charger_data, wpc_rx_type_det_work.work);
 	u8 reg_data, prmc_id;
-	union power_supply_propval value = { .intval = 0 };
+	union power_supply_propval value;
 
 	if (!charger->wc_tx_enable) {
 		__pm_relax(charger->wpc_rx_det_ws);

@@ -48,15 +48,29 @@
 	 * @brief: GET_BIT
 	 *	   Return the value of target bit
 	 */
+<<<<<<< HEAD
+=======
+#ifndef MAX
+>>>>>>> lineage-23.2/lineage-23.2
 #define MAX(a, b) \
 		({__typeof__(a) _a = (a); \
 		__typeof__(b) _b = (b); \
 		_a > _b ? _a : _b; })
+<<<<<<< HEAD
 
+=======
+#endif
+
+#ifndef MIN
+>>>>>>> lineage-23.2/lineage-23.2
 #define MIN(a, b) \
 		({__typeof__(a) _a = (a); \
 		__typeof__(b) _b = (b); \
 		_a < _b ? _a : _b; })
+<<<<<<< HEAD
+=======
+#endif
+>>>>>>> lineage-23.2/lineage-23.2
 
 #define GET_BIT(var, pos) \
 		(((var) & (1 << (pos))) >> (pos))
