@@ -5986,7 +5986,7 @@ bail:
 	return status;
 }
 
-/* Expects you to already be holding tl_inode->i_rwsem */
+/* Expects you to already be holding tl_inode->i_mutex */
 int __ocfs2_flush_truncate_log(struct ocfs2_super *osb)
 {
 	int status;

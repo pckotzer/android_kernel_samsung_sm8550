@@ -160,8 +160,6 @@ void cpu_probe(void)
 	else
 		cpu_set_nofpu_opts(c);
 
-	c->vmbits = 31;
-
 	reserve_exception_space(0, 0x400);
 }
 

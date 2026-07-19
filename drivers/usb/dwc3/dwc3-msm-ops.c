@@ -364,21 +364,6 @@ static int entry_trace_event_raw_event_dwc3_log_ep(struct kretprobe_instance *ri
 	return 0;
 }
 
-static int entry_dwc3_host_exit(struct kretprobe_instance *ri,
-				struct pt_regs *regs)
-{
-	return 0;
-}
-
-static int exit_dwc3_host_exit(struct kretprobe_instance *ri,
-				   struct pt_regs *regs)
-{
-	mdelay(200);
-	return 0;
-}
-
-
-
 static int entry_dwc3_gadget_vbus_draw(struct kretprobe_instance *ri,
 				   struct pt_regs *regs)
 {
