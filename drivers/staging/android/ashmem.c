@@ -253,142 +253,38 @@ static int set_prot_mask(struct ashmem_area *asma, unsigned long prot)
 	return 0;
 }
 
-/*
- * ashmem_get_pin_status - Returns ASHMEM_IS_UNPINNED if _any_ pages in the
- * given interval are unpinned and ASHMEM_IS_PINNED otherwise.
- *
- * Caller must hold ashmem_mutex.
- */
-static int ashmem_get_pin_status(struct ashmem_area *asma, size_t pgstart,
-				 size_t pgend)
-{
-	struct ashmem_range *range;
-	int ret = ASHMEM_IS_PINNED;
-
-	list_for_each_entry(range, &asma->unpinned_list, unpinned) {
-		if (range_before_page(range, pgstart))
-			break;
-		if (page_range_in_range(range, pgstart, pgend)) {
-			ret = ASHMEM_IS_UNPINNED;
-			break;
-		}
-	}
-
-	return ret;
-}
-
-static int ashmem_pin_unpin(struct ashmem_area *asma, unsigned long cmd,
-			    void __user *p)
-{
-	struct ashmem_pin pin;
-	size_t pgstart, pgend;
-	int ret = -EINVAL;
-	struct ashmem_range *range = NULL;
-
-	if (copy_from_user(&pin, p, sizeof(pin)))
-		return -EFAULT;
-
-	if (cmd == ASHMEM_PIN || cmd == ASHMEM_UNPIN) {
-		range = kmem_cache_zalloc(ashmem_range_cachep, GFP_KERNEL);
-		if (!range)
-			return -ENOMEM;
-	}
-
-	mutex_lock(&ashmem_mutex);
-	wait_event(ashmem_shrink_wait, !atomic_read(&ashmem_shrink_inflight));
-
-	if (!asma->file)
-		goto out_unlock;
-
-	/* per custom, you can pass zero for len to mean "everything onward" */
-	if (!pin.len)
-		pin.len = PAGE_ALIGN(asma->size) - pin.offset;
-
-	if ((pin.offset | pin.len) & ~PAGE_MASK)
-		goto out_unlock;
-
-	if (((__u32)-1) - pin.offset < pin.len)
-		goto out_unlock;
-
-	if (PAGE_ALIGN(asma->size) < pin.offset + pin.len)
-		goto out_unlock;
-
-	pgstart = pin.offset / PAGE_SIZE;
-	pgend = pgstart + (pin.len / PAGE_SIZE) - 1;
-
-	switch (cmd) {
-	case ASHMEM_PIN:
-		ret = ashmem_pin(asma, pgstart, pgend, &range);
-		break;
-	case ASHMEM_UNPIN:
-		ret = ashmem_unpin(asma, pgstart, pgend, &range);
-		break;
-	case ASHMEM_GET_PIN_STATUS:
-		ret = ashmem_get_pin_status(asma, pgstart, pgend);
-		break;
-	}
-
-out_unlock:
-	mutex_unlock(&ashmem_mutex);
-	if (range)
-		kmem_cache_free(ashmem_range_cachep, range);
-
-	return ret;
-}
-
-static int get_file_id(struct ashmem_area *asma, unsigned long *ino_ptr)
-{
-	/* Lock around our check to avoid racing with ashmem_mmap(). */
-	mutex_lock(&ashmem_mutex);
-	if (!asma->file) {
-		mutex_unlock(&ashmem_mutex);
-		return -EINVAL;
-	}
-	*ino_ptr = file_inode(asma->file)->i_ino;
-	mutex_unlock(&ashmem_mutex);
-	return 0;
-}
-
 static long ashmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-    struct ashmem_area *asma = file->private_data;
-    unsigned long ino; // Wird für ASHMEM_GET_FILE_ID benötigt
-    long ret;
+	struct ashmem_area *asma = file->private_data;
+	switch (cmd) {
+	case ASHMEM_SET_NAME:
+		return 0;
+	case ASHMEM_GET_NAME:
+		return 0;
+	case ASHMEM_SET_SIZE:
+		if (READ_ONCE(asma->file))
+			return -EINVAL;
 
-    switch (cmd) {
-    case ASHMEM_SET_NAME:
-        return 0;
-    case ASHMEM_GET_NAME:
-        return 0;
-    case ASHMEM_SET_SIZE:
-        if (READ_ONCE(asma->file))
-            return -EINVAL;
+		WRITE_ONCE(asma->size, (size_t)arg);
+		return 0;
+	case ASHMEM_GET_SIZE:
+		return READ_ONCE(asma->size);
+	case ASHMEM_SET_PROT_MASK:
+		return set_prot_mask(asma, arg);
+	case ASHMEM_GET_PROT_MASK:
+		return READ_ONCE(asma->prot_mask);
+	case ASHMEM_PIN:
+		return 0;
+	case ASHMEM_UNPIN:
+		return 0;
+	case ASHMEM_GET_PIN_STATUS:
+		return ASHMEM_IS_PINNED;
+	case ASHMEM_PURGE_ALL_CACHES:
+		return capable(CAP_SYS_ADMIN) ? 0 : -EPERM;
 
-        WRITE_ONCE(asma->size, (size_t)arg);
-        return 0;
-    case ASHMEM_GET_SIZE:
-        return READ_ONCE(asma->size);
-    case ASHMEM_SET_PROT_MASK:
-        return set_prot_mask(asma, arg);
-    case ASHMEM_GET_PROT_MASK:
-        return READ_ONCE(asma->prot_mask);
-    case ASHMEM_PIN:
-        return 0;
-    case ASHMEM_UNPIN:
-        return 0;
-    case ASHMEM_GET_PIN_STATUS:
-        return ASHMEM_IS_PINNED;
-    case ASHMEM_PURGE_ALL_CACHES:
-        return capable(CAP_SYS_ADMIN) ? 0 : -EPERM;
-    case ASHMEM_GET_FILE_ID:
-        ret = get_file_id(asma, &ino);
-        if (ret)
-            return ret;
+	}
 
-        return put_user(ino, (unsigned long __user *)arg) ? -EFAULT : 0;
-    }
-
-    return -ENOTTY;
+	return -ENOTTY;
 }
 
 /* support of 32bit userspace on 64bit platforms */
@@ -396,10 +292,6 @@ static long ashmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 static long compat_ashmem_ioctl(struct file *file, unsigned int cmd,
 				unsigned long arg)
 {
-	struct ashmem_area *asma = file->private_data;
-	unsigned long ino;
-	long ret;
-
 	switch (cmd) {
 	case COMPAT_ASHMEM_SET_SIZE:
 		cmd = ASHMEM_SET_SIZE;
@@ -407,12 +299,6 @@ static long compat_ashmem_ioctl(struct file *file, unsigned int cmd,
 	case COMPAT_ASHMEM_SET_PROT_MASK:
 		cmd = ASHMEM_SET_PROT_MASK;
 		break;
-	case COMPAT_ASHMEM_GET_FILE_ID:
-		ret = get_file_id(asma, &ino);
-		if (ret)
-			return ret;
-
-		return put_user(ino, (compat_uptr_t __user *)compat_ptr(arg)) ? -EFAULT : 0;
 	}
 	return ashmem_ioctl(file, cmd, arg);
 }

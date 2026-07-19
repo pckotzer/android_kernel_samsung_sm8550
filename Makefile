@@ -813,30 +813,42 @@ else ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS += -Os
 endif
 
-# --- CPU/Arch specific Flags ---
+# ==============================================================================
+# ARCHITEKTUR & OPTIMIERUNGS-BASIS (SM8550 Snapdragon 8 Gen 2)
+# ==============================================================================
 ARM64_CPU_FLAGS   := cortex-a710+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+nosve
-ARM64_MARCH_FLAGS := armv9-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm
-ARM64_OPT_FLAGS   := -O3 -fvectorize -fslp-vectorize -ffunction-sections -fdata-sections
+ARM64_MARCH_FLAGS := armv9.2-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm
+ARM64_OPT_FLAGS   := -O2 -ffunction-sections -fdata-sections
 
-KBUILD_CFLAGS += $(call cc-option,-march=$(ARM64_MARCH_FLAGS))
-KBUILD_CFLAGS += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
-KBUILD_CFLAGS += $(call cc-option,-mtune=cortex-x3)
-KBUILD_CFLAGS += $(ARM64_OPT_FLAGS)
-KBUILD_CFLAGS += $(call cc-option,-falign-functions=16)
-KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-hoist)
-KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-sink)
+KBUILD_CFLAGS     += $(call cc-option,-march=$(ARM64_MARCH_FLAGS))
+KBUILD_CFLAGS     += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
+KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-x3)
+KBUILD_CFLAGS     += $(ARM64_OPT_FLAGS)
+
+# Ausrichtung auf 16-Byte Grenzen: Sweetspot für ARM64 Instruction Fetcher
+KBUILD_CFLAGS     += $(call cc-option,-falign-functions=16)
+#KBUILD_CFLAGS     += $(call cc-option,-falign-loops=16)
+KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-hoist)
+KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-sink)
 KBUILD_CFLAGS += -Xclang -vectorize-loops
 KBUILD_CFLAGS += -Xclang -vectorize-slp
+#KBUILD_CFLAGS += -mllvm --enable-epilogue-vectorization
+KBUILD_CFLAGS += -fno-signed-zeros
 KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
 KBUILD_CFLAGS += -mllvm --enable-dse-partial-store-merging
-KBUILD_CFLAGS += $(call cc-option,-fno-semantic-interposition)
-KBUILD_CFLAGS += $(call cc-option,-frename-registers)
-KBUILD_CFLAGS += $(call cc-option,-fno-signed-zeros)
-KBUILD_CFLAGS += $(call cc-option,-fsched-interblock)
-KBUILD_CFLAGS += $(call cc-option,-fgcse-after-reload)
-KBUILD_CFLAGS += $(call cc-option,-fuse-ld=lld)
-KBUILD_CFLAGS += $(call cc-disable-warning,maybe-uninitialized)
-KBUILD_CFLAGS += -ffp-contract=fast -g0
+KBUILD_CFLAGS += -mllvm --enable-epilogue-vectorization
+# Keine semantische Interposition (erlaubt bessere Inlining-Entscheidungen im Kernel)
+KBUILD_CFLAGS   += $(call cc-option,-fno-semantic-interposition)
+KBUILD_CFLAGS   += $(call cc-option,-frename-registers)
+KBUILD_CFLAGS   += $(call cc-option,-fno-signed-zeros)
+KBUILD_CFLAGS   += $(call cc-option,-fsched-interblock)
+KBUILD_CFLAGS   += $(call cc-option,-fgcse-after-reload)
+KBUILD_CFLAGS   += $(call cc-option,-fuse-ld=lld)
+KBUILD_CFLAGS   += $(call cc-disable-warning,maybe-uninitialized)
+KBUILD_CFLAGS   += -ffp-contract=fast -g0
+KBUILD_CFLAGS += $(call cc-option,-floop-unroll-and-jam)
+KBUILD_CFLAGS += $(call cc-option,-fpeel-loops)
+KBUILD_CFLAGS += $(call cc-option,-fprefetch-loop-arrays)
 KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
 KBUILD_CFLAGS += -mllvm --enable-interleaved-mem-accesses
 KBUILD_CFLAGS += -mllvm --enable-loop-flatten
@@ -849,33 +861,12 @@ KBUILD_CFLAGS += -mllvm -aarch64-enable-ldst-opt
 KBUILD_CFLAGS += -mllvm -aarch64-enable-ccmp
 KBUILD_CFLAGS += -mllvm -aarch64-early-ifcvt
 
-ifdef CONFIG_LLVM_POLLY
-KBUILD_CFLAGS	+= -mllvm -polly \
-		   -mllvm -polly-run-inliner \
-		   -mllvm -polly-ast-use-context \
-		   -mllvm -polly-detect-keep-going \
-		   -mllvm -polly-invariant-load-hoisting \
-		   -mllvm -polly-vectorizer=stripmine
-
-ifeq ($(shell test $(CONFIG_CLANG_VERSION) -gt 130000; echo $$?),0)
-KBUILD_CFLAGS	+= -mllvm -polly-loopfusion-greedy=1 \
-		   -mllvm -polly-reschedule=1 \
-		   -mllvm -polly-postopts=1 \
-		   -mllvm -polly-num-threads=0 \
-		   -mllvm -polly-omp-backend=LLVM \
-		   -mllvm -polly-scheduling=dynamic \
-		   -mllvm -polly-scheduling-chunksize=1
-else
-KBUILD_CFLAGS	+= -mllvm -polly-opt-fusion=max
-endif
-
 # Polly may optimise loops with dead paths beyound what the linker
 # can understand. This may negate the effect of the linker's DCE
 # so we tell Polly to perfom proven DCE on the loops it optimises
 # in order to preserve the overall effect of the linker's DCE.
 ifdef CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 POLLY_FLAGS	+= -mllvm -polly-run-dce
-endif
 endif
 
 # Tell gcc to never replace conditional load with a non-conditional one
