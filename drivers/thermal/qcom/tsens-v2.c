@@ -41,7 +41,6 @@ static struct tsens_features tsens_v2_feat = {
 	.max_sensors	= 16,
 };
 
-
 static const struct reg_field tsens_v2_regfields[MAX_REGFIELDS] = {
 	/* ----- SROT ------ */
 	/* VERSION */

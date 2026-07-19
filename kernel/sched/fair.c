@@ -6796,7 +6796,7 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 		return target;
 
 	if (sched_smt_active())
-		has_idle_core = test_idle_cores(target, false);
+	has_idle_core = test_idle_cores(target, false);
 
 	i = select_idle_cpu(p, sd, has_idle_core, target);
 	if ((unsigned)i < nr_cpumask_bits)

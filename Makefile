@@ -860,9 +860,7 @@ KBUILD_CFLAGS += $(call cc-option,-fschedule-insns2)
 KBUILD_CFLAGS += -mllvm -aarch64-enable-ldst-opt
 KBUILD_CFLAGS += -mllvm -aarch64-enable-ccmp
 KBUILD_CFLAGS += -mllvm -aarch64-early-ifcvt
-# ==============================================================================
-# 5. POLLY INTEGRATION (Mit deaktivertem Polly-Vektorisierer = Sicher & Schnell)
-# ==============================================================================
+
 # Polly may optimise loops with dead paths beyound what the linker
 # can understand. This may negate the effect of the linker's DCE
 # so we tell Polly to perfom proven DCE on the loops it optimises
@@ -1116,46 +1114,8 @@ export CC_FLAGS_CFI
 endif
 
 ifneq ($(CONFIG_FUNCTION_ALIGNMENT),0)
-KBUILD_CFLAGS += -falign-functions=16
+KBUILD_CFLAGS += -falign-functions=$(CONFIG_FUNCTION_ALIGNMENT)
 endif
-#KBUILD_CFLAGS   += $(call cc-option,-falign-functions=16)
-KBUILD_CFLAGS   += $(call cc-option,-falign-loops=16)
-
-# Befreit das Frame-Pointer-Register für mehr Leistung
-KBUILD_CFLAGS   += $(call cc-option,-fomit-frame-pointer)
-
-# Erlaubt moderates, partielles Schleifen-Unrolling (Vorsichtig testen!)
-#KBUILD_CFLAGS   += $(call cc-option,-mllvm -unroll-allow-partial)
-
-# Global Value Numbering für schlankeren Code (Vorsichtig testen!)
-#KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-hoist)
-KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-sink)
-
-# Linker Flags (für LLD)
-ifeq ($(CONFIG_LD_IS_LLD), y)
-# Füge --gc-sections hinzu, um ungenutzten Code zu entfernen
-LDFLAGS_LLD := -mllvm -march=$(ARM64_MARCH_FLAGS) -mllvm -polly-run-dce \
-                   -mllvm -polly-run-inliner \
-                   -mllvm -polly-loopfusion-greedy=1 \
-                   -mllvm -polly-tiling \
-                   -mllvm -polly-tile-sizes=16,32 \
-                   -mllvm -polly-run-dce \
-                   -mllvm --enable-ext-tsp-block-placement \
-                   -mllvm --enable-epilogue-vectorization \
-                   -mllvm -inlinehint-threshold=600
-KBUILD_LDFLAGS += $(LDFLAGS_LLD)
-endif
-
-# Verwende den modernen Linker (schnellerer Build, sauberer Code)
-KBUILD_CFLAGS   += $(call cc-option,-fuse-ld=lld)
-
-# Debug-Müll entfernen (spart Platz und Overhead)
-KBUILD_CFLAGS   += -g0
-
-# Sichere Schleifenoptimierung (ohne unroll-and-jam)
-#KBUILD_CFLAGS   += $(call cc-option,-ftree-vectorize)
-
-# Keine semantische Interposition (erlaubt bessere Inlining-Entscheidungen im Kernel)htig testen!)
 
 # arch Makefile may override CC so keep this after arch Makefile is included
 NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)
