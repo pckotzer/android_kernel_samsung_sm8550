@@ -3262,3 +3262,4 @@ module_exit(max77705_fuelgauge_exit);
 MODULE_DESCRIPTION("Samsung max77705 Fuel Gauge Driver");
 MODULE_AUTHOR("Samsung Electronics");
 MODULE_LICENSE("GPL");
+
