@@ -825,42 +825,28 @@ KBUILD_CFLAGS     += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
 KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-x3)
 KBUILD_CFLAGS     += $(ARM64_OPT_FLAGS)
 
-# Ausrichtung auf 16-Byte Grenzen: Sweetspot für ARM64 Instruction Fetcher
-KBUILD_CFLAGS     += $(call cc-option,-falign-functions=16)
-#KBUILD_CFLAGS     += $(call cc-option,-falign-loops=16)
-KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-hoist)
-KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-sink)
-KBUILD_CFLAGS += -Xclang -vectorize-loops
-KBUILD_CFLAGS += -Xclang -vectorize-slp
-#KBUILD_CFLAGS += -mllvm --enable-epilogue-vectorization
-KBUILD_CFLAGS += -fno-signed-zeros
-KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
-KBUILD_CFLAGS += -mllvm --enable-dse-partial-store-merging
-KBUILD_CFLAGS += -mllvm --enable-epilogue-vectorization
-# Keine semantische Interposition (erlaubt bessere Inlining-Entscheidungen im Kernel)
-KBUILD_CFLAGS   += $(call cc-option,-fno-semantic-interposition)
-KBUILD_CFLAGS   += $(call cc-option,-frename-registers)
-KBUILD_CFLAGS   += $(call cc-option,-fno-signed-zeros)
-KBUILD_CFLAGS   += $(call cc-option,-fsched-interblock)
-KBUILD_CFLAGS   += $(call cc-option,-fgcse-after-reload)
-KBUILD_CFLAGS   += $(call cc-option,-fuse-ld=lld)
-KBUILD_CFLAGS   += $(call cc-disable-warning,maybe-uninitialized)
-KBUILD_CFLAGS   += -ffp-contract=fast -g0
-KBUILD_CFLAGS += $(call cc-option,-floop-unroll-and-jam)
-KBUILD_CFLAGS += $(call cc-option,-fpeel-loops)
-KBUILD_CFLAGS += $(call cc-option,-fprefetch-loop-arrays)
-KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
-KBUILD_CFLAGS += -mllvm --enable-interleaved-mem-accesses
-KBUILD_CFLAGS += -mllvm --enable-loop-flatten
-KBUILD_CFLAGS += -mllvm --enable-dse-partial-store-merging
-KBUILD_CFLAGS += -mllvm --enable-epilogue-vectorization
 KBUILD_CFLAGS += $(call cc-option,-fno-semantic-interposition)
-KBUILD_CFLAGS += $(call cc-option,-fno-math-errno)
+
+KBUILD_CFLAGS += $(call cc-option,-falign-functions=32)
+
+KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-hoist)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-sink)
+
+KBUILD_CFLAGS += $(call cc-option,-fsched-interblock)
 KBUILD_CFLAGS += $(call cc-option,-fschedule-insns2)
+
 KBUILD_CFLAGS += -mllvm -aarch64-enable-ldst-opt
 KBUILD_CFLAGS += -mllvm -aarch64-enable-ccmp
 KBUILD_CFLAGS += -mllvm -aarch64-early-ifcvt
 
+KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
+
+KBUILD_CFLAGS += -mllvm -enable-load-pre
+KBUILD_CFLAGS += -mllvm -enable-gvn-memdep
+
+KBUILD_CFLAGS += -mllvm -inlinehint-threshold=300
+KBUILD_CFLAGS += -mllvm -hot-callsite-threshold=300
+KBUILD_CFLAGS += -mllvm -unroll-threshold=250
 # Polly may optimise loops with dead paths beyound what the linker
 # can understand. This may negate the effect of the linker's DCE
 # so we tell Polly to perfom proven DCE on the loops it optimises
