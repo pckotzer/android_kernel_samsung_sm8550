@@ -813,18 +813,6 @@ else ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS += -Os
 endif
 
-# ==============================================================================
-# ARCHITEKTUR & OPTIMIERUNGS-BASIS (SM8550 Snapdragon 8 Gen 2)
-# ==============================================================================
-ARM64_CPU_FLAGS   := cortex-a710+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+nosve
-ARM64_MARCH_FLAGS := armv9.2-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm
-ARM64_OPT_FLAGS   := -O2 -ffunction-sections -fdata-sections
-
-KBUILD_CFLAGS     += $(call cc-option,-march=$(ARM64_MARCH_FLAGS))
-KBUILD_CFLAGS     += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
-KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-x3)
-KBUILD_CFLAGS     += $(ARM64_OPT_FLAGS)
-
 KBUILD_CFLAGS += $(call cc-option,-fno-semantic-interposition)
 
 KBUILD_CFLAGS += $(call cc-option,-falign-functions=32)
@@ -844,9 +832,6 @@ KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
 KBUILD_CFLAGS += -mllvm -enable-load-pre
 KBUILD_CFLAGS += -mllvm -enable-gvn-memdep
 
-KBUILD_CFLAGS += -mllvm -inlinehint-threshold=300
-KBUILD_CFLAGS += -mllvm -hot-callsite-threshold=300
-KBUILD_CFLAGS += -mllvm -unroll-threshold=250
 # Polly may optimise loops with dead paths beyound what the linker
 # can understand. This may negate the effect of the linker's DCE
 # so we tell Polly to perfom proven DCE on the loops it optimises
@@ -1114,22 +1099,7 @@ KBUILD_CFLAGS   += $(call cc-option,-fomit-frame-pointer)
 
 # Global Value Numbering für schlankeren Code (Vorsichtig testen!)
 #KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-hoist)
-KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-sink)
-
-# Linker Flags (für LLD)
-ifeq ($(CONFIG_LD_IS_LLD), y)
-# Füge --gc-sections hinzu, um ungenutzten Code zu entfernen
-LDFLAGS_LLD := -mllvm -march=$(ARM64_MARCH_FLAGS) -mllvm -polly-run-dce \
-                   -mllvm -polly-run-inliner \
-                   -mllvm -polly-loopfusion-greedy=1 \
-                   -mllvm -polly-tiling \
-                   -mllvm -polly-tile-sizes=16,32 \
-                   -mllvm -polly-run-dce \
-                   -mllvm --enable-ext-tsp-block-placement \
-                   -mllvm --enable-epilogue-vectorization \
-                   -mllvm -inlinehint-threshold=600
-KBUILD_LDFLAGS += $(LDFLAGS_LLD)
-endif
+#KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-sink)
 
 # Verwende den modernen Linker (schnellerer Build, sauberer Code)
 KBUILD_CFLAGS   += $(call cc-option,-fuse-ld=lld)

@@ -112,14 +112,9 @@ endif
 # ==============================================================================
 # ARCHITEKTUR & OPTIMIERUNGS-BASIS (SM8550 Snapdragon 8 Gen 2)
 # ==============================================================================
-ARM64_CPU_FLAGS   := cortex-a710+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+nosve
-ARM64_MARCH_FLAGS := armv9.2-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm
-ARM64_OPT_FLAGS   := -O2 -fvectorize -fslp-vectorize -ffunction-sections -fdata-sections
-
-KBUILD_CFLAGS     += $(call cc-option,-march=$(ARM64_MARCH_FLAGS))
+ARM64_CPU_FLAGS   := cortex-a510
 KBUILD_CFLAGS     += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
 KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-x3)
-KBUILD_CFLAGS     += $(ARM64_OPT_FLAGS)
 
 KBUILD_CFLAGS += $(call cc-option,-fno-semantic-interposition)
 
@@ -139,10 +134,6 @@ KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
 
 KBUILD_CFLAGS += -mllvm -enable-load-pre
 KBUILD_CFLAGS += -mllvm -enable-gvn-memdep
-
-KBUILD_CFLAGS += -mllvm -inlinehint-threshold=300
-KBUILD_CFLAGS += -mllvm -hot-callsite-threshold=300
-KBUILD_CFLAGS += -mllvm -unroll-threshold=250
 
 ifeq ($(CONFIG_SHADOW_CALL_STACK), y)
 KBUILD_CFLAGS	+= -ffixed-x18
