@@ -40,7 +40,7 @@ endif
 cc_has_k_constraint := $(call try-run,echo				\
 	'int main(void) {						\
 		asm volatile("and w0, w0, %w0" :: "K" (4294967295));	\
-		return 0;						\
+		return 0;																							\
 	}' | $(CC) -S -x c -o "$$TMP" -,,-DCONFIG_CC_HAS_K_CONSTRAINT=1)
 
 ifeq ($(CONFIG_BROKEN_GAS_INST),y)
@@ -48,7 +48,7 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
 endif
 
 KBUILD_CFLAGS	+= -mgeneral-regs-only	\
-		   $(compat_vdso) $(cc_has_k_constraint)
+			   $(compat_vdso) $(cc_has_k_constraint)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, psabi)
 KBUILD_AFLAGS	+= $(compat_vdso)
 
@@ -116,24 +116,42 @@ ARM64_CPU_FLAGS   := cortex-a510
 KBUILD_CFLAGS     += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
 KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-x3)
 
-KBUILD_CFLAGS += $(call cc-option,-fno-semantic-interposition)
+# ------------------------------------------------------------------------------
+# Syscall-Pfad-Experimente (Full LTO). Standard = alles AUS = Basis wie im
+# schnellen 131-ns-Image. Einzeln zuschalten, immer nur EIN Schalter pro Build:
+#   make ABL_ALIGN=32   Funktions-Alignment (leer = kein Flag, Default vom -mtune)
+#   make ABL_LTO=1      lld-Codegen-Flags (ext-tsp, Inline-/Unroll-Schwellen)
+#   make ABL_ORDER=1    Symbol-Ordering aus syscall-order.txt
+# Bei Build-Skripten statt Kommandozeile hier den Default aendern.
+# WICHTIG: -falign-functions NICHT zusaetzlich im Top-Level-Makefile setzen,
+# dort gewinnt sonst die spaetere Zeile.
+# ------------------------------------------------------------------------------
+ABL_ALIGN ?=
+ABL_LTO   ?= 0
+ABL_ORDER ?= 0
 
-KBUILD_CFLAGS += $(call cc-option,-falign-functions=32)
+ifneq ($(ABL_ALIGN),)
+KBUILD_CFLAGS += $(call cc-option,-falign-functions=$(ABL_ALIGN))
+endif
 
-KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-hoist)
-KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-sink)
-
-KBUILD_CFLAGS += $(call cc-option,-fsched-interblock)
-KBUILD_CFLAGS += $(call cc-option,-fschedule-insns2)
-
-KBUILD_CFLAGS += -mllvm -aarch64-enable-ldst-opt
-KBUILD_CFLAGS += -mllvm -aarch64-enable-ccmp
-KBUILD_CFLAGS += -mllvm -aarch64-early-ifcvt
-
-KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
-
-KBUILD_CFLAGS += -mllvm -enable-load-pre
-KBUILD_CFLAGS += -mllvm -enable-gvn-memdep
+ifeq ($(CONFIG_LTO_CLANG), y)
+ifeq ($(CONFIG_LD_IS_LLD), y)
+# Bei Full LTO laeuft der Codegen im lld-Link mit KBUILD_LDFLAGS (dort stehen
+# auch --lto-O3 und -regalloc-enable-advisor), nicht in LDFLAGS_vmlinux.
+ifeq ($(ABL_LTO),1)
+KBUILD_LDFLAGS += -mllvm -enable-ext-tsp-block-placement
+KBUILD_LDFLAGS += -mllvm -inlinehint-threshold=300
+KBUILD_LDFLAGS += -mllvm -unroll-threshold=250
+endif
+# Reihenfolge wirkt beim Endlink von vmlinux -> LDFLAGS_vmlinux
+ifeq ($(ABL_ORDER),1)
+SYSCALL_ORDER := $(srctree)/syscall-order.txt
+ifneq ($(wildcard $(SYSCALL_ORDER)),)
+LDFLAGS_vmlinux += --symbol-ordering-file=$(SYSCALL_ORDER) --no-warn-symbol-ordering
+endif
+endif
+endif
+endif
 
 ifeq ($(CONFIG_SHADOW_CALL_STACK), y)
 KBUILD_CFLAGS	+= -ffixed-x18

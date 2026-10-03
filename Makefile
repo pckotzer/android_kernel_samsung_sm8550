@@ -815,7 +815,7 @@ endif
 
 KBUILD_CFLAGS += $(call cc-option,-fno-semantic-interposition)
 
-KBUILD_CFLAGS += $(call cc-option,-falign-functions=32)
+KBUILD_CFLAGS += $(call cc-option,-falign-functions=64)
 
 KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-hoist)
 KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-sink)

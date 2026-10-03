@@ -1,0 +1,6 @@
+el0t_64_sync_handler
+el0_svc
+do_el0_svc
+invoke_syscall
+__arm64_sys_getppid
+__arm64_sys_getpid
