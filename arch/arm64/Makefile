@@ -84,9 +84,9 @@ branch-prot-flags-$(CONFIG_CC_HAS_SIGN_RETURN_ADDRESS) := -msign-return-address=
 # narrow potential for ROP protection benefits and no substantial
 # performance impact has been observed.
 ifeq ($(CONFIG_ARM64_BTI_KERNEL),y)
-branch-prot-flags-$(CONFIG_CC_HAS_BRANCH_PROT_PAC_RET_BTI) := -mbranch-protection=pac-ret+leaf+bti
+branch-prot-flags-$(CONFIG_CC_HAS_BRANCH_PROT_PAC_RET_BTI) := -mbranch-protection=pac-ret+bti
 else
-branch-prot-flags-$(CONFIG_CC_HAS_BRANCH_PROT_PAC_RET) := -mbranch-protection=pac-ret+leaf
+branch-prot-flags-$(CONFIG_CC_HAS_BRANCH_PROT_PAC_RET) := -mbranch-protection=pac-ret
 endif
 # -march=armv8.3-a enables the non-nops instructions for PAC, to avoid the
 # compiler to generate them and consequently to break the single image contract
@@ -115,6 +115,21 @@ endif
 ARM64_CPU_FLAGS   := cortex-a510
 KBUILD_CFLAGS     += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
 KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-x3)
+ 
+KBUILD_CFLAGS += $(call cc-option,-fno-semantic-interposition)
+
+KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-hoist)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-sink)
+
+KBUILD_CFLAGS += $(call cc-option,-fsched-interblock)
+KBUILD_CFLAGS += $(call cc-option,-fschedule-insns2)
+
+KBUILD_CFLAGS += -mllvm -aarch64-enable-ldst-opt
+KBUILD_CFLAGS += -mllvm -aarch64-enable-ccmp
+KBUILD_CFLAGS += -mllvm -aarch64-early-ifcvt
+
+KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
+
 
 # ------------------------------------------------------------------------------
 # Syscall-Pfad-Experimente (Full LTO). Standard = alles AUS = Basis wie im
@@ -126,9 +141,9 @@ KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-x3)
 # WICHTIG: -falign-functions NICHT zusaetzlich im Top-Level-Makefile setzen,
 # dort gewinnt sonst die spaetere Zeile.
 # ------------------------------------------------------------------------------
-ABL_ALIGN ?=
-ABL_LTO   ?= 0
-ABL_ORDER ?= 0
+ABL_ALIGN ?= 64
+ABL_LTO   ?= 1
+ABL_ORDER ?= 1
 
 ifneq ($(ABL_ALIGN),)
 KBUILD_CFLAGS += $(call cc-option,-falign-functions=$(ABL_ALIGN))

@@ -813,25 +813,6 @@ else ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS += -Os
 endif
 
-KBUILD_CFLAGS += $(call cc-option,-fno-semantic-interposition)
-
-KBUILD_CFLAGS += $(call cc-option,-falign-functions=64)
-
-KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-hoist)
-KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-sink)
-
-KBUILD_CFLAGS += $(call cc-option,-fsched-interblock)
-KBUILD_CFLAGS += $(call cc-option,-fschedule-insns2)
-
-KBUILD_CFLAGS += -mllvm -aarch64-enable-ldst-opt
-KBUILD_CFLAGS += -mllvm -aarch64-enable-ccmp
-KBUILD_CFLAGS += -mllvm -aarch64-early-ifcvt
-
-KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
-
-KBUILD_CFLAGS += -mllvm -enable-load-pre
-KBUILD_CFLAGS += -mllvm -enable-gvn-memdep
-
 # Polly may optimise loops with dead paths beyound what the linker
 # can understand. This may negate the effect of the linker's DCE
 # so we tell Polly to perfom proven DCE on the loops it optimises
@@ -1103,6 +1084,24 @@ KBUILD_CFLAGS   += $(call cc-option,-fomit-frame-pointer)
 
 # Verwende den modernen Linker (schnellerer Build, sauberer Code)
 KBUILD_CFLAGS   += $(call cc-option,-fuse-ld=lld)
+
+KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-x3)
+ 
+KBUILD_CFLAGS += $(call cc-option,-fno-semantic-interposition)
+
+KBUILD_CFLAGS += $(call cc-option,-falign-functions=32)
+
+KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-hoist)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-sink)
+
+KBUILD_CFLAGS += $(call cc-option,-fsched-interblock)
+KBUILD_CFLAGS += $(call cc-option,-fschedule-insns2)
+
+KBUILD_CFLAGS += -mllvm -aarch64-enable-ldst-opt
+KBUILD_CFLAGS += -mllvm -aarch64-enable-ccmp
+KBUILD_CFLAGS += -mllvm -aarch64-early-ifcvt
+
+KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
 
 # Debug-Müll entfernen (spart Platz und Overhead)
 KBUILD_CFLAGS   += -g0
