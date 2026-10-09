@@ -813,33 +813,12 @@ else ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS += -Os
 endif
 
-ifdef CONFIG_LLVM_POLLY
-KBUILD_CFLAGS	+= -mllvm -polly \
-		   -mllvm -polly-run-inliner \
-		   -mllvm -polly-ast-use-context \
-		   -mllvm -polly-detect-keep-going \
-		   -mllvm -polly-invariant-load-hoisting \
-		   -mllvm -polly-vectorizer=stripmine
-
-ifeq ($(shell test $(CONFIG_CLANG_VERSION) -gt 130000; echo $$?),0)
-KBUILD_CFLAGS	+= -mllvm -polly-loopfusion-greedy=1 \
-		   -mllvm -polly-reschedule=1 \
-		   -mllvm -polly-postopts=1 \
-		   -mllvm -polly-num-threads=0 \
-		   -mllvm -polly-omp-backend=LLVM \
-		   -mllvm -polly-scheduling=dynamic \
-		   -mllvm -polly-scheduling-chunksize=1
-else
-KBUILD_CFLAGS	+= -mllvm -polly-opt-fusion=max
-endif
-
 # Polly may optimise loops with dead paths beyound what the linker
 # can understand. This may negate the effect of the linker's DCE
 # so we tell Polly to perfom proven DCE on the loops it optimises
 # in order to preserve the overall effect of the linker's DCE.
 ifdef CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 POLLY_FLAGS	+= -mllvm -polly-run-dce
-endif
 endif
 
 # Tell gcc to never replace conditional load with a non-conditional one
@@ -1087,8 +1066,45 @@ export CC_FLAGS_CFI
 endif
 
 ifneq ($(CONFIG_FUNCTION_ALIGNMENT),0)
-KBUILD_CFLAGS += -falign-functions=$(CONFIG_FUNCTION_ALIGNMENT)
+KBUILD_CFLAGS += -falign-functions=16
 endif
+
+#KBUILD_CFLAGS   += $(call cc-option,-falign-functions=16)
+KBUILD_CFLAGS   += $(call cc-option,-falign-loops=16)
+
+# Befreit das Frame-Pointer-Register für mehr Leistung
+KBUILD_CFLAGS   += $(call cc-option,-fomit-frame-pointer)
+
+# Erlaubt moderates, partielles Schleifen-Unrolling (Vorsichtig testen!)
+#KBUILD_CFLAGS   += $(call cc-option,-mllvm -unroll-allow-partial)
+
+# Global Value Numbering für schlankeren Code (Vorsichtig testen!)
+#KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-hoist)
+#KBUILD_CFLAGS   += $(call cc-option,-mllvm -enable-gvn-sink)
+
+# Verwende den modernen Linker (schnellerer Build, sauberer Code)
+KBUILD_CFLAGS   += $(call cc-option,-fuse-ld=lld)
+
+KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-x3)
+ 
+KBUILD_CFLAGS += $(call cc-option,-fno-semantic-interposition)
+
+KBUILD_CFLAGS += $(call cc-option,-falign-functions=32)
+
+KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-hoist)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-sink)
+
+KBUILD_CFLAGS += $(call cc-option,-fsched-interblock)
+KBUILD_CFLAGS += $(call cc-option,-fschedule-insns2)
+
+KBUILD_CFLAGS += -mllvm -aarch64-enable-ldst-opt
+KBUILD_CFLAGS += -mllvm -aarch64-enable-ccmp
+KBUILD_CFLAGS += -mllvm -aarch64-early-ifcvt
+
+KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
+
+# Debug-Müll entfernen (spart Platz und Overhead)
+KBUILD_CFLAGS   += -g0
 
 # arch Makefile may override CC so keep this after arch Makefile is included
 NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)

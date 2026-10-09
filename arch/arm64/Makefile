@@ -10,15 +10,26 @@
 #
 # Copyright (C) 1995-2001 by Russell King
 
-LDFLAGS_vmlinux	:=--no-undefined -X --pic-veneer
+LDFLAGS_vmlinux	:=--no-undefined -X --pic-veneer -pie --lto-O3 --strip-debug
 
 ifeq ($(CONFIG_RELOCATABLE), y)
 # Pass --no-apply-dynamic-relocs to restore pre-binutils-2.27 behaviour
 # for relative relocs, since this leads to better Image compression
 # with the relocation offsets always being zero.
-LDFLAGS_vmlinux		+= -shared -Bsymbolic -z notext \
+LDFLAGS_vmlinux		+= -Bsymbolic -z notext \
 			$(call ld-option, --no-apply-dynamic-relocs)
+			
+			# Pass -shared for bfd and -pie for lld to minimize Image size on both
+ifeq ($(ld-name),bfd)
+LDFLAGS_vmlinux		+= -shared
 endif
+ifeq ($(ld-name),lld)
+LDFLAGS_vmlinux		+= -pie
+ 
+
+endif
+endif
+
 
 ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
   ifeq ($(CONFIG_ARM64_LD_HAS_FIX_ERRATUM_843419),y)
@@ -29,7 +40,7 @@ endif
 cc_has_k_constraint := $(call try-run,echo				\
 	'int main(void) {						\
 		asm volatile("and w0, w0, %w0" :: "K" (4294967295));	\
-		return 0;						\
+		return 0;																							\
 	}' | $(CC) -S -x c -o "$$TMP" -,,-DCONFIG_CC_HAS_K_CONSTRAINT=1)
 
 ifeq ($(CONFIG_BROKEN_GAS_INST),y)
@@ -37,7 +48,7 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
 endif
 
 KBUILD_CFLAGS	+= -mgeneral-regs-only	\
-		   $(compat_vdso) $(cc_has_k_constraint)
+			   $(compat_vdso) $(cc_has_k_constraint)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, psabi)
 KBUILD_AFLAGS	+= $(compat_vdso)
 
@@ -98,36 +109,65 @@ ifeq ($(CONFIG_AS_HAS_ARMV8_5), y)
 asm-arch := armv8.5-a
 endif
 
-# --- CPU/Arch specific Flags ---
-ARM64_CPU_FLAGS := cotrex-a710+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm+nosve
-ARM64_MARCH_FLAGS := armv9.2-a+nosve+crc+crypto+fp+simd+rdm+dotprod+aes+sha2+sha3+sm4+fp16+i8mm
-ARM64_TUNE_FLAGS := neoverse-n2
-ARM64_OPT_FLAGS := -O3 -fvectorize -fslp-vectorize -ffunction-sections -fdata-sections
-
-KBUILD_CFLAGS += $(call cc-option,-march=$(ARM64_MARCH_FLAGS))
-KBUILD_CFLAGS += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
-KBUILD_CFLAGS += $(call cc-option,-mtune=$(ARM64_TUNE_FLAGS))
-KBUILD_CFLAGS += $(ARM64_OPT_FLAGS)
-KBUILD_CFLAGS += $(call cc-option,-falign-functions=16)
-
-# Linker Flags (for LLD)
-ifeq ($(CONFIG_LD_IS_LLD), y)
-# Füge --gc-sections hinzu, um ungenutzten Code zu entfernen
-LDFLAGS_LLD := -mllvm -march=$(ARM64_MARCH_FLAGS) -mllvm -polly-run-dce
-KBUILD_LDFLAGS += $(LDFLAGS_LLD)
-endif
-KBUILD_CFLAGS   += $(call cc-option,-frename-registers)
-KBUILD_CFLAGS   += $(call cc-option,-fsched-interblock)
-KBUILD_CFLAGS   += $(call cc-option,-fgcse-after-reload)
-KBUILD_CFLAGS   += $(call cc-option,-fuse-ld=lld)
-KBUILD_CFLAGS   += $(call cc-disable-warning,maybe-uninitialized)
-KBUILD_CFLAGS   += -ffp-contract=fast -g0
-KBUILD_CFLAGS += $(call cc-option,-floop-unroll-and-jam)
-KBUILD_CFLAGS += $(call cc-option,-fpeel-loops)
-KBUILD_CFLAGS += $(call cc-option,-fprefetch-loop-arrays)
+# ==============================================================================
+# ARCHITEKTUR & OPTIMIERUNGS-BASIS (SM8550 Snapdragon 8 Gen 2)
+# ==============================================================================
+ARM64_CPU_FLAGS   := cortex-a510
+KBUILD_CFLAGS     += $(call cc-option,-mcpu=$(ARM64_CPU_FLAGS))
+KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-x3)
+ 
 KBUILD_CFLAGS += $(call cc-option,-fno-semantic-interposition)
-KBUILD_CFLAGS += $(call cc-option,-fno-math-errno)
+
+KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-hoist)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-sink)
+
+KBUILD_CFLAGS += $(call cc-option,-fsched-interblock)
 KBUILD_CFLAGS += $(call cc-option,-fschedule-insns2)
+
+KBUILD_CFLAGS += -mllvm -aarch64-enable-ldst-opt
+KBUILD_CFLAGS += -mllvm -aarch64-enable-ccmp
+KBUILD_CFLAGS += -mllvm -aarch64-early-ifcvt
+
+KBUILD_CFLAGS += -mllvm --enable-ext-tsp-block-placement
+
+
+# ------------------------------------------------------------------------------
+# Syscall-Pfad-Experimente (Full LTO). Standard = alles AUS = Basis wie im
+# schnellen 131-ns-Image. Einzeln zuschalten, immer nur EIN Schalter pro Build:
+#   make ABL_ALIGN=32   Funktions-Alignment (leer = kein Flag, Default vom -mtune)
+#   make ABL_LTO=1      lld-Codegen-Flags (ext-tsp, Inline-/Unroll-Schwellen)
+#   make ABL_ORDER=1    Symbol-Ordering aus syscall-order.txt
+# Bei Build-Skripten statt Kommandozeile hier den Default aendern.
+# WICHTIG: -falign-functions NICHT zusaetzlich im Top-Level-Makefile setzen,
+# dort gewinnt sonst die spaetere Zeile.
+# ------------------------------------------------------------------------------
+ABL_ALIGN ?= 64
+ABL_LTO   ?= 1
+ABL_ORDER ?= 1
+
+ifneq ($(ABL_ALIGN),)
+KBUILD_CFLAGS += $(call cc-option,-falign-functions=$(ABL_ALIGN))
+endif
+
+ifeq ($(CONFIG_LTO_CLANG), y)
+ifeq ($(CONFIG_LD_IS_LLD), y)
+# Bei Full LTO laeuft der Codegen im lld-Link mit KBUILD_LDFLAGS (dort stehen
+# auch --lto-O3 und -regalloc-enable-advisor), nicht in LDFLAGS_vmlinux.
+ifeq ($(ABL_LTO),1)
+KBUILD_LDFLAGS += -mllvm -enable-ext-tsp-block-placement
+KBUILD_LDFLAGS += -mllvm -inlinehint-threshold=300
+KBUILD_LDFLAGS += -mllvm -unroll-threshold=250
+endif
+# Reihenfolge wirkt beim Endlink von vmlinux -> LDFLAGS_vmlinux
+ifeq ($(ABL_ORDER),1)
+SYSCALL_ORDER := $(srctree)/syscall-order.txt
+ifneq ($(wildcard $(SYSCALL_ORDER)),)
+LDFLAGS_vmlinux += --symbol-ordering-file=$(SYSCALL_ORDER) --no-warn-symbol-ordering
+endif
+endif
+endif
+endif
+
 ifeq ($(CONFIG_SHADOW_CALL_STACK), y)
 KBUILD_CFLAGS	+= -ffixed-x18
 endif
