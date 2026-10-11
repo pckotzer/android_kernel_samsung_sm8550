@@ -1066,7 +1066,7 @@ export CC_FLAGS_CFI
 endif
 
 ifneq ($(CONFIG_FUNCTION_ALIGNMENT),0)
-KBUILD_CFLAGS += -falign-functions=16
+KBUILD_CFLAGS += -falign-functions=64
 endif
 
 #KBUILD_CFLAGS   += $(call cc-option,-falign-functions=16)
@@ -1089,7 +1089,7 @@ KBUILD_CFLAGS     += $(call cc-option,-mtune=cortex-x3)
  
 KBUILD_CFLAGS += $(call cc-option,-fno-semantic-interposition)
 
-KBUILD_CFLAGS += $(call cc-option,-falign-functions=32)
+KBUILD_CFLAGS += $(call cc-option,-falign-functions=64)
 
 KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-hoist)
 KBUILD_CFLAGS += $(call cc-option,-mllvm -enable-gvn-sink)
