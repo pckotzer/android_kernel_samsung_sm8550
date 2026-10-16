@@ -2,6 +2,7 @@
 #
 # Makefile for the kernel block layer
 #
+CFLAGS_adios.o := -std=gnu11 -Wno-declaration-after-statement
 ccflags-y += -O3 -ffast-math
 obj-y		:= bdev.o fops.o bio.o elevator.o blk-core.o blk-sysfs.o \
 			blk-flush.o blk-settings.o blk-ioc.o blk-map.o \
@@ -22,6 +23,7 @@ obj-$(CONFIG_BLK_CGROUP_IOLATENCY)	+= blk-iolatency.o
 obj-$(CONFIG_BLK_CGROUP_IOCOST)	+= blk-iocost.o
 obj-$(CONFIG_MQ_IOSCHED_DEADLINE)	+= mq-deadline.o
 obj-$(CONFIG_MQ_IOSCHED_KYBER)	+= kyber-iosched.o
+obj-$(CONFIG_MQ_IOSCHED_ADIOS)	+= adios.o
 bfq-y				:= bfq-iosched.o bfq-wf2q.o bfq-cgroup.o
 obj-$(CONFIG_IOSCHED_BFQ)	+= bfq.o
 ssg-$(CONFIG_MQ_IOSCHED_SSG)	:= ssg-iosched.o ssg-stat.o
