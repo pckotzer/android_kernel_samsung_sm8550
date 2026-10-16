@@ -36,6 +36,43 @@ struct devfreq_cdev_device {
 
 static struct devfreq_cdev_device *devfreq_cdev;
 
+/**
+ * devfreq_dram_set_max_freq - API für SuperWALT Governor
+ * @freq_khz: Maximale Frequenz in kHz (0 oder PM_QOS_MAX_FREQUENCY_DEFAULT_VALUE zum Aufheben)
+ */
+int devfreq_dram_set_max_freq(unsigned int freq_khz)
+{
+	int ret = 0, i;
+	unsigned long target_khz;
+
+	if (!devfreq_cdev || !devfreq_cdev->dev || !devfreq_cdev->freq_table)
+		return -ENODEV;
+
+	if (freq_khz == 0) {
+		target_khz = PM_QOS_MAX_FREQUENCY_DEFAULT_VALUE;
+	} else {
+		/* Suche den passendsten Eintrag aus der kHz-Tabelle */
+		target_khz = devfreq_cdev->freq_table[devfreq_cdev->max_state];
+
+		for (i = 0; i <= devfreq_cdev->max_state; i++) {
+			if (devfreq_cdev->freq_table[i] <= freq_khz) {
+				target_khz = devfreq_cdev->freq_table[i];
+				break;
+			}
+		}
+	}
+
+	/* Übergebe den Wert direkt in kHz an PM QoS (Samsung bus_dcvs Standard) */
+	ret = dev_pm_qos_update_request(&devfreq_cdev->qos_max_freq_req, target_khz);
+	if (ret < 0) {
+		pr_err("Error updating DRAM PM QoS request to %lu kHz (err: %d)\n", target_khz, ret);
+		return ret;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(devfreq_dram_set_max_freq);
+
 static int devfreq_cdev_set_state(struct thermal_cooling_device *cdev,
 					unsigned long state)
 {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * This is based on schedutil governor but modified to work with
- * WALT.
+ * SuperWALT CPUFreq Governor for SM8550 (Kernel 5.15)
+ * Integrated DDR RAM & CPU Battery Capping Logic
  *
  * Copyright (C) 2016, Intel Corporation
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
@@ -20,6 +20,9 @@
 
 #include "walt.h"
 #include "trace.h"
+
+/* Externer C-API Aufruf aus dcvs.c */
+extern int bus_dcvs_set_ddr_max_freq(unsigned int freq_khz);
 
 static bool screen_is_off = false;
 
@@ -60,6 +63,9 @@ struct waltgov_tunables {
 	unsigned int		cpu0bat_100, cpu0bat_70, cpu0bat_50, cpu0bat_30, cpu0bat_20, cpu0bat_10;
 	unsigned int		cpu3bat_100, cpu3bat_70, cpu3bat_50, cpu3bat_30, cpu3bat_20, cpu3bat_10;
 	unsigned int		cpu7bat_100, cpu7bat_70, cpu7bat_50, cpu7bat_30, cpu7bat_20, cpu7bat_10;
+
+	/* DDR RAM Battery Custom Tunables (SM8550 Frequenzen in kHz) */
+	unsigned int		ddrbat_100, ddrbat_70, ddrbat_50, ddrbat_30, ddrbat_20, ddrbat_10;
 };
 
 struct waltgov_policy {
@@ -83,7 +89,6 @@ struct waltgov_policy {
 	unsigned int		cached_raw_freq;
 	unsigned int		driving_cpu;
 
-	/* The next fields are only needed if fast switch cannot be used: */
 	struct	irq_work	irq_work;
 	struct	kthread_work	work;
 	struct	mutex		work_lock;
@@ -112,6 +117,12 @@ struct waltgov_cpu {
 DEFINE_PER_CPU(struct waltgov_callback *, waltgov_cb_data);
 static DEFINE_PER_CPU(struct waltgov_cpu, waltgov_cpu);
 static DEFINE_PER_CPU(struct waltgov_tunables *, cached_tunables);
+
+/* Helper-Funktion weit oben im File definieren */
+static inline struct waltgov_tunables *to_waltgov_tunables(struct gov_attr_set *attr_set)
+{
+	return container_of(attr_set, struct waltgov_tunables, attr_set);
+}
 
 /* Global atomics for safe reading in spinlock context */
 static atomic_t walt_thermal_temp = ATOMIC_INIT(0);
@@ -150,7 +161,7 @@ static unsigned int apply_voltage_awareness(struct waltgov_cpu *wg_cpu, unsigned
 	}
 
 	if (eff_limit > 0 && next_freq > eff_limit) {
-	unsigned int margin = mult_frac(eff_limit, 100 + margin_pct, 100);
+		unsigned int margin = mult_frac(eff_limit, 100 + margin_pct, 100);
 		if (next_freq < margin) return eff_limit;
 	}
 	return next_freq;
@@ -158,57 +169,92 @@ static unsigned int apply_voltage_awareness(struct waltgov_cpu *wg_cpu, unsigned
 
 static unsigned int apply_screen_off_logic(struct waltgov_cpu *wg_cpu, unsigned int next_freq)
 {
-       if (screen_is_off) {
-              /* Cap silver cores (0-2) at 0.9GHz */
-               if (wg_cpu->cpu <= 2)
-                       return min(next_freq, 901600U);
+	if (screen_is_off) {
+		if (wg_cpu->cpu <= 2)
+			return min(next_freq, 901600U);
                
-		/* Cores 3-7 (Gold/Prime) forced to absolute minimum */
-               return wg_cpu->wg_policy->policy->cpuinfo.min_freq;
-       }
-       return next_freq;
+		return wg_cpu->wg_policy->policy->cpuinfo.min_freq;
+	}
+	return next_freq;
 }
 
-
 /**
- * walt_update_thermal_temp - External API to update governor temperature
+ * apply_ddr_battery_limits - DDR RAM Frequenzsteuerung über bus_dcvs_set_ddr_max_freq C-API
  */
+static void apply_ddr_battery_limits(int pct)
+{
+	struct waltgov_tunables *t = per_cpu(cached_tunables, 0);
+	unsigned int ddr_limit_khz = 4800000;
+
+	if (atomic_read(&walt_is_charging)) {
+		ddr_limit_khz = 0; /* Unbegrenzt beim Laden */
+	} else if (t) {
+		if (pct <= 10)      ddr_limit_khz = t->ddrbat_10;
+		else if (pct <= 20) ddr_limit_khz = t->ddrbat_20;
+		else if (pct <= 30) ddr_limit_khz = t->ddrbat_30;
+		else if (pct <= 50) ddr_limit_khz = t->ddrbat_50;
+		else if (pct <= 70) ddr_limit_khz = t->ddrbat_70;
+		else                ddr_limit_khz = t->ddrbat_100;
+	} else {
+		/* Fallbacks vor Tunables-Init */
+		if (pct <= 10)      ddr_limit_khz = 1555000;
+		else if (pct <= 20) ddr_limit_khz = 1843200;
+		else if (pct <= 30) ddr_limit_khz = 2736000;
+		else if (pct <= 50) ddr_limit_khz = 3686000;
+		else if (pct <= 70) ddr_limit_khz = 4224000;
+		else                ddr_limit_khz = 4800000;
+	}
+
+	bus_dcvs_set_ddr_max_freq(ddr_limit_khz);
+}
+
+/* Spezial-Makro für DDR-Bat Sysfs Stores mit Direkt-Trigger */
+#define store_ddrbat_attr(name)                                        \
+static ssize_t store_##name(struct gov_attr_set *attr_set,             \
+                const char *buf, size_t count)                        \
+{                                                                      \
+    struct waltgov_tunables *tunables = to_waltgov_tunables(attr_set); \
+    if (kstrtouint(buf, 10, &tunables->name))                          \
+        return -EINVAL;                                                \
+    apply_ddr_battery_limits(atomic_read(&walt_battery_pct));         \
+    return count;                                                      \
+}
+
+store_ddrbat_attr(ddrbat_100);
+store_ddrbat_attr(ddrbat_70);
+store_ddrbat_attr(ddrbat_50);
+store_ddrbat_attr(ddrbat_30);
+store_ddrbat_attr(ddrbat_20);
+store_ddrbat_attr(ddrbat_10);
+
 void walt_update_thermal_temp(int temp)
 {
 	atomic_set(&walt_thermal_temp, temp);
 }
 EXPORT_SYMBOL(walt_update_thermal_temp);
 
-/**
- * walt_update_battery_level - External API to update governor battery state
- */
 void walt_update_battery_level(int pct)
 {
 	atomic_set(&walt_battery_pct, pct);
+	apply_ddr_battery_limits(pct);
 }
 EXPORT_SYMBOL(walt_update_battery_level);
 
-/**
- * walt_update_charging_status - External API to update charging state
- */
 void walt_update_charging_status(int charging)
 {
 	atomic_set(&walt_is_charging, !!charging);
+	apply_ddr_battery_limits(atomic_read(&walt_battery_pct));
 }
 EXPORT_SYMBOL(walt_update_charging_status);
 
 /************************ Governor internals ***********************/
 
-/**
- * apply_battery_limits - Per-Cluster Battery Capping Logic
- */
 static unsigned int apply_battery_limits(struct waltgov_cpu *wg_cpu, unsigned int next_freq)
 {
 	struct waltgov_tunables *t = wg_cpu->wg_policy->tunables;
 	int pct = atomic_read(&walt_battery_pct);
 	unsigned int limit = 0;
 
-	/* If charging is detected via notifier, bypass battery limits */
 	if (atomic_read(&walt_is_charging)) {
 		return next_freq;
 	}
@@ -239,9 +285,6 @@ static unsigned int apply_battery_limits(struct waltgov_cpu *wg_cpu, unsigned in
 	return (limit > 0) ? min(next_freq, limit) : next_freq;
 }
 
-/**
- * apply_custom_thermal_limits - Safe frequency capping based on temp
- */
 static unsigned int apply_custom_thermal_limits(struct waltgov_cpu *wg_cpu, unsigned int next_freq)
 {
 	struct waltgov_tunables *t = wg_cpu->wg_policy->tunables;
@@ -715,11 +758,6 @@ static void waltgov_irq_work(struct irq_work *irq_work)
 
 /************************** sysfs interface ************************/
 
-static inline struct waltgov_tunables *to_waltgov_tunables(struct gov_attr_set *attr_set)
-{
-	return container_of(attr_set, struct waltgov_tunables, attr_set);
-}
-
 static DEFINE_MUTEX(min_rate_lock);
 
 static void update_min_rate_limit_ns(struct waltgov_policy *wg_policy)
@@ -730,7 +768,6 @@ static void update_min_rate_limit_ns(struct waltgov_policy *wg_policy)
 	mutex_unlock(&min_rate_lock);
 }
 
-/* Macros to generate attribute handlers */
 #define WALTGOV_ATTR_RW(_name)                         \
 static struct governor_attr _name =                    \
 __ATTR(_name, 0644, show_##_name, store_##_name)
@@ -754,7 +791,6 @@ static ssize_t store_##name(struct gov_attr_set *attr_set,        \
     return count;                            \
 }
 
-/* Custom handler definitions */
 static ssize_t up_rate_limit_us_show(struct gov_attr_set *attr_set, char *buf)
 {
 	struct waltgov_tunables *tunables = to_waltgov_tunables(attr_set);
@@ -956,7 +992,6 @@ static ssize_t target_load_thresh_show(struct gov_attr_set *attr_set, char *buf)
 	return scnprintf(buf, PAGE_SIZE, "%u\n", tunables->target_load_thresh);
 }
 
-
 static ssize_t target_load_thresh_store(struct gov_attr_set *attr_set,
 				const char *buf, size_t count)
 {
@@ -1003,7 +1038,7 @@ static ssize_t global_battery_store(struct gov_attr_set *attr_set, const char *b
 {
 	int pct;
 	if (kstrtoint(buf, 10, &pct)) return -EINVAL;
-	atomic_set(&walt_battery_pct, pct);
+	walt_update_battery_level(pct);
 	return count;
 }
 
@@ -1019,14 +1054,12 @@ static ssize_t global_charging_store(struct gov_attr_set *attr_set, const char *
 {
 	int charging;
 	if (kstrtoint(buf, 10, &charging)) return -EINVAL;
-	atomic_set(&walt_is_charging, !!charging);
+	walt_update_charging_status(charging);
 	return count;
 }
 
 static struct governor_attr global_charging = __ATTR(global_charging, 0644, global_charging_show, global_charging_store);
 
-
-/* Generate standard show/store functions using macros */
 show_attr(adaptive_low_freq);
 store_attr(adaptive_low_freq);
 show_attr(adaptive_high_freq);
@@ -1081,6 +1114,14 @@ show_attr(cpu7bat_50);  store_attr(cpu7bat_50);
 show_attr(cpu7bat_30);  store_attr(cpu7bat_30);
 show_attr(cpu7bat_20);  store_attr(cpu7bat_20);
 show_attr(cpu7bat_10);  store_attr(cpu7bat_10);
+
+/* DDR RAM Battery Attributes (Show-Attribute generieren, Store bereits oben definiert) */
+show_attr(ddrbat_100);
+show_attr(ddrbat_70);
+show_attr(ddrbat_50);
+show_attr(ddrbat_30);
+show_attr(ddrbat_20);
+show_attr(ddrbat_10);
 
 show_attr(cpu0_eff_limit);
 store_attr(cpu0_eff_limit);
@@ -1146,6 +1187,7 @@ static struct governor_attr cpu7_window_ms = __ATTR_RW(cpu7_window_ms);
 static struct governor_attr cpu3_window_ms = __ATTR_RW(cpu3_window_ms);
 WALTGOV_ATTR_RW(adaptive_low_freq_kernel);
 WALTGOV_ATTR_RW(adaptive_high_freq_kernel);
+
 /* Voltage Margin Awareness Attributes */
 WALTGOV_ATTR_RW(cpu0_eff_limit);
 WALTGOV_ATTR_RW(cpu3_eff_limit);
@@ -1172,6 +1214,10 @@ WALTGOV_ATTR_RW(cpu3bat_30); WALTGOV_ATTR_RW(cpu3bat_20); WALTGOV_ATTR_RW(cpu3ba
 WALTGOV_ATTR_RW(cpu7bat_100); WALTGOV_ATTR_RW(cpu7bat_70); WALTGOV_ATTR_RW(cpu7bat_50);
 WALTGOV_ATTR_RW(cpu7bat_30); WALTGOV_ATTR_RW(cpu7bat_20); WALTGOV_ATTR_RW(cpu7bat_10);
 
+/* DDR RAM Battery Attributes */
+WALTGOV_ATTR_RW(ddrbat_100); WALTGOV_ATTR_RW(ddrbat_70); WALTGOV_ATTR_RW(ddrbat_50);
+WALTGOV_ATTR_RW(ddrbat_30); WALTGOV_ATTR_RW(ddrbat_20); WALTGOV_ATTR_RW(ddrbat_10);
+
 /* Adaptive frequency functions */
 int cpufreq_walt_set_adaptive_freq(unsigned int cpu, unsigned int adaptive_low_freq,
 				   unsigned int adaptive_high_freq)
@@ -1196,7 +1242,6 @@ int cpufreq_walt_set_adaptive_freq(unsigned int cpu, unsigned int adaptive_low_f
 	}
 	return -EINVAL;
 }
-
 EXPORT_SYMBOL(cpufreq_walt_set_adaptive_freq);
 
 int cpufreq_walt_get_adaptive_freq(unsigned int cpu, unsigned int *adaptive_low_freq,
@@ -1259,6 +1304,9 @@ static struct attribute *waltgov_attributes[] = {
 	&cpu3bat_30.attr, &cpu3bat_20.attr, &cpu3bat_10.attr,
 	&cpu7bat_100.attr, &cpu7bat_70.attr, &cpu7bat_50.attr,
 	&cpu7bat_30.attr, &cpu7bat_20.attr, &cpu7bat_10.attr,
+	/* DDR RAM Battery Tunables */
+	&ddrbat_100.attr, &ddrbat_70.attr, &ddrbat_50.attr,
+	&ddrbat_30.attr, &ddrbat_20.attr, &ddrbat_10.attr,
 	&global_battery.attr,
 	&global_charging.attr,
 	/* Voltage Margin Awareness Attributes */
@@ -1424,6 +1472,14 @@ static void waltgov_tunables_save(struct cpufreq_policy *policy,
 	cached->cpu7bat_30 = tunables->cpu7bat_30;
 	cached->cpu7bat_20 = tunables->cpu7bat_20;
 	cached->cpu7bat_10 = tunables->cpu7bat_10;
+
+	/* Cache DDR RAM Battery Tunables */
+	cached->ddrbat_100 = tunables->ddrbat_100;
+	cached->ddrbat_70 = tunables->ddrbat_70;
+	cached->ddrbat_50 = tunables->ddrbat_50;
+	cached->ddrbat_30 = tunables->ddrbat_30;
+	cached->ddrbat_20 = tunables->ddrbat_20;
+	cached->ddrbat_10 = tunables->ddrbat_10;
 }
 
 static void waltgov_tunables_restore(struct cpufreq_policy *policy)
@@ -1499,6 +1555,14 @@ static void waltgov_tunables_restore(struct cpufreq_policy *policy)
 	tunables->cpu7bat_30 = cached->cpu7bat_30;
 	tunables->cpu7bat_20 = cached->cpu7bat_20;
 	tunables->cpu7bat_10 = cached->cpu7bat_10;
+
+	/* Restore DDR RAM Battery Tunables */
+	tunables->ddrbat_100 = cached->ddrbat_100;
+	tunables->ddrbat_70 = cached->ddrbat_70;
+	tunables->ddrbat_50 = cached->ddrbat_50;
+	tunables->ddrbat_30 = cached->ddrbat_30;
+	tunables->ddrbat_20 = cached->ddrbat_20;
+	tunables->ddrbat_10 = cached->ddrbat_10;
 }
 
 static int waltgov_init(struct cpufreq_policy *policy)
@@ -1546,19 +1610,21 @@ static int waltgov_init(struct cpufreq_policy *policy)
 	tunables->cpu0_volt_margin_pct = 80;
 	tunables->cpu3_volt_margin_pct = 28;
 	tunables->cpu7_volt_margin_pct = 38;
+
 	/* Set Temperature Selection Defaults */
 	tunables->cpu0temp_45 = 1900800;
 	tunables->cpu3temp_58 = 2154400;
 	tunables->cpu3temp_61 = 2000000;
 	tunables->cpu3temp_62 = 1800000;
 	tunables->cpu3temp_63 = 1700000;
-	tunables->cpu3temp_70 = 1000000;
+	tunables->cpu0temp_70 = 1000000;
 	tunables->cpu7temp_58 = 2254400;
 	tunables->cpu7temp_61 = 1800000;
 	tunables->cpu7temp_62 = 1500000;
 	tunables->cpu7temp_63 = 9980000;
 	tunables->cpu7temp_70 = 556400;
 
+	/* CPU Cluster Battery Limits */
 	tunables->cpu0bat_100 = 9999999;
 	tunables->cpu0bat_70 =  9999999;
 	tunables->cpu0bat_50 =  1720000;
@@ -1579,6 +1645,14 @@ static int waltgov_init(struct cpufreq_policy *policy)
 	tunables->cpu7bat_30 =  1300000;
 	tunables->cpu7bat_20 =  998000;
 	tunables->cpu7bat_10 =  556000;
+
+	/* DDR RAM SM8550 Standard Frequenzen (kHz) */
+	tunables->ddrbat_100 = 4800000;
+	tunables->ddrbat_70  = 4224000;
+	tunables->ddrbat_50  = 3686000;
+	tunables->ddrbat_30  = 2736000;
+	tunables->ddrbat_20  = 1843200;
+	tunables->ddrbat_10  = 1555000;
 
 	if (is_min_cluster_cpu(policy->cpu))
 		tunables->rtg_boost_freq = DEFAULT_SILVER_RTG_BOOST_FREQ;
