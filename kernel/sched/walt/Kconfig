@@ -57,21 +57,4 @@ config SCHED_POWER_OPTIMIZE
 	  when conservative prediction load enable condition.
 	  if we enable and apply some value,
 	  we can make overall system power better.
-	  
-config CPU_FREQ_GOV_SUPERWALT
-    tristate "SuperWALT: Advanced window-based frequency governor"
-    depends on SMP
-    help
-      This option enables the SuperWALT cpufreq governor, a highly optimized,
-      hardware-aware iteration of the window-based frequency tracking engine.
-      SuperWALT enhances traditional utility-driven frequency selection by
-      integrating important vectors directly into the scheduler's scaling 
-      loop. It features:
-        - Battery capping per cluster
-        - Thermal throttle stepped limit profiles.
-        - Voltage margin awareness and efficiency optimization.
-        - Screen-off active power limits.
-
-      If unsure, say Y if you are building for platforms using advanced 
-      Window-Assisted Load Tracking (WALT) schedulers.
 endmenu

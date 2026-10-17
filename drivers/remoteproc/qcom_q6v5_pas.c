@@ -1109,7 +1109,7 @@ static int adsp_init_regulator(struct qcom_adsp *adsp)
 {
 	int len;
 	int i, rc;
-	char uv_ua[50];
+	char reg_prop[50];
 	u32 uv_ua_vals[2];
 	const char *reg_name;
 
@@ -1132,10 +1132,28 @@ static int adsp_init_regulator(struct qcom_adsp *adsp)
 
 		adsp->regs[i].reg = devm_regulator_get(adsp->dev, reg_name);
 		if (IS_ERR(adsp->regs[i].reg)) {
+			rc = PTR_ERR(adsp->regs[i].reg);
+
+			/*
+			 * Sensor supplies can be provided by a PMIC which has not
+			 * finished probing yet. Do not mistake probe deferral for
+			 * an absent optional regulator.
+			 */
+			if (rc == -EPROBE_DEFER)
+				return dev_err_probe(adsp->dev, rc,
+						     "waiting for %s reg\n", reg_name);
 #if IS_ENABLED(CONFIG_SEC_SENSORS_SSC)
 			if (!strcmp(reg_name, SENSOR_SUPPLY_NAME) ||
 				!strcmp(reg_name, SUBSENSOR_SUPPLY_NAME) ||
 				!strcmp(reg_name, PROX_VDD_NAME)) {
+				snprintf(reg_prop, sizeof(reg_prop), "%s-supply",
+					 reg_name);
+				if (of_find_property(adsp->dev->of_node,
+						     reg_prop, NULL))
+					return dev_err_probe(adsp->dev, rc,
+							     "failed to get %s reg\n",
+							     reg_name);
+
 				dev_info(adsp->dev, "%s ignore %s %d\n",
 					__func__, reg_name, adsp->reg_cnt--);
 				return 0;
@@ -1146,23 +1164,23 @@ static int adsp_init_regulator(struct qcom_adsp *adsp)
 		}
 
 		/* Read current(uA) and voltage(uV) value */
-		snprintf(uv_ua, sizeof(uv_ua), "%s-uV-uA", reg_name);
-		if (!of_find_property(adsp->dev->of_node, uv_ua, &len))
-			continue;
+		snprintf(reg_prop, sizeof(reg_prop), "%s-uV-uA", reg_name);
+		if (of_find_property(adsp->dev->of_node, reg_prop, &len)) {
+			rc = of_property_read_u32_array(adsp->dev->of_node,
+							reg_prop, uv_ua_vals,
+							ARRAY_SIZE(uv_ua_vals));
+			if (rc) {
+				dev_err(adsp->dev,
+					"Failed to read uVuA value(rc:%d)\n", rc);
+				return rc;
+			}
 
-		rc = of_property_read_u32_array(adsp->dev->of_node, uv_ua,
-						uv_ua_vals,
-						ARRAY_SIZE(uv_ua_vals));
-		if (rc) {
-			dev_err(adsp->dev, "Failed to read uVuA value(rc:%d)\n",
-				rc);
-			return rc;
+			if (uv_ua_vals[0] > 0)
+				adsp->regs[i].uV = uv_ua_vals[0];
+			if (uv_ua_vals[1] > 0)
+				adsp->regs[i].uA = uv_ua_vals[1];
 		}
 
-		if (uv_ua_vals[0] > 0)
-			adsp->regs[i].uV = uv_ua_vals[0];
-		if (uv_ua_vals[1] > 0)
-			adsp->regs[i].uA = uv_ua_vals[1];
 #if IS_ENABLED(CONFIG_SEC_SENSORS_SSC)
 		if (!strcmp(reg_name, SENSOR_SUPPLY_NAME)) {
 			dev_info(adsp->dev, "found %s, idx: %d\n", reg_name, i);

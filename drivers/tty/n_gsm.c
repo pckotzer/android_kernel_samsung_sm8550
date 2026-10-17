@@ -908,6 +908,16 @@ static int gsm_data_kick(struct gsm_mux *gsm)
 			list_del(&msg->list);
 			kfree(msg);
 			continue;
+		ret = gsm_send_packet(gsm, msg);
+		switch (ret) {
+		case -ENOSPC:
+			return -ENOSPC;
+		case -ENODEV:
+			/* ldisc not open */
+			gsm->tx_bytes -= msg->len;
+			list_del(&msg->list);
+			kfree(msg);
+			continue;
 		default:
 			if (ret >= 0) {
 				list_del(&msg->list);

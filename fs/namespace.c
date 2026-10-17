@@ -41,13 +41,6 @@
 #include "internal.h"
 #include <trace/hooks/blk.h>
 
-#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-extern bool susfs_is_current_ksu_domain(void);
-extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
-
-#define CL_COPY_MNT_NS BIT(25) /* used by copy_mnt_ns() */
-#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-
 /* Maximum number of mounts in a mount namespace */
 unsigned int sysctl_mount_max __read_mostly = 100000;
 
@@ -3917,6 +3910,11 @@ SYSCALL_DEFINE3(fsmount, int, fs_fd, unsigned int, flags,
 	newmount.mnt = vfs_create_mount(fc);
 	if (IS_ERR(newmount.mnt)) {
 		ret = PTR_ERR(newmount.mnt);
+		goto err_unlock;
+	}
+	if (newmount.mnt->mnt_sb->s_flags & SB_NOUSER) {
+		mntput(newmount.mnt);
+		ret = -EINVAL;
 		goto err_unlock;
 	}
 	newmount.dentry = dget(fc->root);
