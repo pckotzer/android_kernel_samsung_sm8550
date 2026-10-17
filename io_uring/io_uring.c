@@ -6144,7 +6144,7 @@ static int __io_poll_add(struct io_kiocb *req, unsigned int issue_flags)
 	if (!ret && ipt.error)
 		req_set_fail(req);
 	ret = ret ?: ipt.error;
-	if (ret > 0) {
+	if (ret)
 		__io_req_complete(req, issue_flags, ret, 0);
 	return ret;
 }
@@ -6153,14 +6153,6 @@ static int io_poll_add(struct io_kiocb *req, unsigned int issue_flags)
 {
 	__io_poll_add(req, issue_flags);
 	return 0;
-}
-
-static int io_poll_add(struct io_kiocb *req, unsigned int issue_flags)
-{
-	int ret;
-
-	ret = __io_poll_add(req, issue_flags);
-	return ret < 0 ? ret : 0;
 }
 
 static int io_poll_update(struct io_kiocb *req, unsigned int issue_flags)
