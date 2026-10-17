@@ -351,53 +351,62 @@ static int get_file_id(struct ashmem_area *asma, unsigned long *ino_ptr)
 
 static long ashmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	struct ashmem_area *asma = file->private_data;
-	switch (cmd) {
-	case ASHMEM_SET_NAME:
-		return 0;
-	case ASHMEM_GET_NAME:
-		return 0;
-	case ASHMEM_SET_SIZE:
-		ret = -EINVAL;
-		mutex_lock(&ashmem_mutex);
-		if (!asma->file) {
-			ret = 0;
-			asma->size = (size_t)arg;
-		}
-		mutex_unlock(&ashmem_mutex);
-		break;
-	case ASHMEM_GET_SIZE:
-		ret = asma->size;
-		break;
-	case ASHMEM_SET_PROT_MASK:
-		ret = set_prot_mask(asma, arg);
-		break;
-	case ASHMEM_GET_PROT_MASK:
-		ret = asma->prot_mask;
-		break;
-	case ASHMEM_PIN:
-	case ASHMEM_UNPIN:
-	case ASHMEM_GET_PIN_STATUS:
-		ret = ashmem_pin_unpin(asma, cmd, (void __user *)arg);
-		break;
-	case ASHMEM_PURGE_ALL_CACHES:
-		ret = -EPERM;
-		if (capable(CAP_SYS_ADMIN)) {
-			struct shrink_control sc = {
-				.gfp_mask = GFP_KERNEL,
-				.nr_to_scan = LONG_MAX,
-			};
-			ret = ashmem_shrink_count(&ashmem_shrinker, &sc);
-			ashmem_shrink_scan(&ashmem_shrinker, &sc);
-		}
-		break;
-	case ASHMEM_GET_FILE_ID:
-		ret = get_file_id(asma, &ino);
-		if (ret)
-			break;
+    struct ashmem_area *asma = file->private_data;
+    long ret = 0;
+    unsigned long ino;
 
-		ret = put_user(ino, (unsigned long __user *)arg) ? -EFAULT : 0;
-		break;
+    switch (cmd) {
+    case ASHMEM_SET_NAME:
+    case ASHMEM_GET_NAME:
+        return 0;
+    case ASHMEM_SET_SIZE:
+        ret = -EINVAL;
+        mutex_lock(&ashmem_mutex);
+        if (!asma->file) {
+            ret = 0;
+            asma->size = (size_t)arg;
+        }
+        mutex_unlock(&ashmem_mutex);
+        break;
+    case ASHMEM_GET_SIZE:
+        ret = asma->size;
+        break;
+    case ASHMEM_SET_PROT_MASK:
+        ret = set_prot_mask(asma, arg);
+        break;
+    case ASHMEM_GET_PROT_MASK:
+        ret = asma->prot_mask;
+        break;
+    case ASHMEM_PIN:
+    case ASHMEM_UNPIN:
+    case ASHMEM_GET_PIN_STATUS:
+        ret = ashmem_pin_unpin(asma, cmd, (void __user *)arg);
+        break;
+    case ASHMEM_PURGE_ALL_CACHES:
+        ret = -EPERM;
+        if (capable(CAP_SYS_ADMIN)) {
+            struct shrink_control sc = {
+                .gfp_mask = GFP_KERNEL,
+                .nr_to_scan = LONG_MAX,
+            };
+            ret = ashmem_shrink_count(&ashmem_shrinker, &sc);
+            ashmem_shrink_scan(&ashmem_shrinker, &sc);
+        }
+        break;
+    case ASHMEM_GET_FILE_ID:
+        ret = get_file_id(asma, &ino);
+        if (ret)
+            break;
+
+        ret = put_user(ino, (unsigned long __user *)arg) ? -EFAULT : 0;
+        break;
+    default:
+        ret = -ENOTTY;
+        break;
+    }
+
+    return ret;
+}
 	}
 
 	return -ENOTTY;

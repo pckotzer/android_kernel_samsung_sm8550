@@ -6503,6 +6503,7 @@ static int sec_usb_set_property(struct power_supply *psy,
 	}
 }
 
+>>>>>>> lineage-24.0/lineage-24.0
 static int sec_ac_get_property(struct power_supply *psy,
 				enum power_supply_property psp,
 				union power_supply_propval *val)
