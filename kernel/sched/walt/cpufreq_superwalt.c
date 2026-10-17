@@ -17,6 +17,10 @@
 #include <linux/sec_panel_notifier.h>
 #include <linux/power_supply.h>
 #include <linux/module.h>
+#include <soc/qcom/dcvs.h>
+
+/* implemented in dcvs.c; declared here so this file builds even if dcvs.h lacks it */
+extern int qcom_dcvs_set_max_freq(enum dcvs_hw_type hw_type, u32 max_khz);
 
 #include "walt.h"
 #include "trace.h"
@@ -118,6 +122,95 @@ static atomic_t walt_thermal_temp = ATOMIC_INIT(0);
 static atomic_t walt_battery_pct = ATOMIC_INIT(100);
 static atomic_t walt_is_charging = ATOMIC_INIT(0);
 
+/*
+ * DDR throttling. Same inputs and same tiers as the CPU caps (temperature,
+ * battery, screen off), but the cap goes to the DCVS DDR path.
+ * Values are kHz from /sys/devices/system/cpu/bus_dcvs/DDR/available_frequencies,
+ * 0 = no cap for that tier. The result is the lowest cap of all active tiers.
+ */
+static unsigned int ddr_temp_cap[6];	/* 45, 58, 61, 62, 63, 70 C */
+static unsigned int ddr_bat_cap[6];	/* <=100, 70, 50, 30, 20, 10 % */
+static unsigned int ddr_screen_off_cap;
+static atomic_t walt_ddr_applied = ATOMIC_INIT(0);
+
+static inline unsigned int ddr_min_cap(unsigned int a, unsigned int b)
+{
+	if (!a)
+		return b;
+	if (!b)
+		return a;
+	return min(a, b);
+}
+
+static unsigned int waltgov_ddr_calc_cap(void)
+{
+	int temp = atomic_read(&walt_thermal_temp);
+	int pct = atomic_read(&walt_battery_pct);
+	unsigned int cap = 0, c = 0;
+
+	if (temp >= 70000 && ddr_temp_cap[5])
+		c = ddr_temp_cap[5];
+	else if (temp >= 63000 && ddr_temp_cap[4])
+		c = ddr_temp_cap[4];
+	else if (temp >= 62000 && ddr_temp_cap[3])
+		c = ddr_temp_cap[3];
+	else if (temp >= 61000 && ddr_temp_cap[2])
+		c = ddr_temp_cap[2];
+	else if (temp >= 58000 && ddr_temp_cap[1])
+		c = ddr_temp_cap[1];
+	else if (temp >= 45000)
+		c = ddr_temp_cap[0];
+	cap = ddr_min_cap(cap, c);
+
+	/* like apply_battery_limits(): no battery cap while charging */
+	if (!atomic_read(&walt_is_charging)) {
+		if (pct <= 10)
+			c = ddr_bat_cap[5];
+		else if (pct <= 20)
+			c = ddr_bat_cap[4];
+		else if (pct <= 30)
+			c = ddr_bat_cap[3];
+		else if (pct <= 50)
+			c = ddr_bat_cap[2];
+		else if (pct <= 70)
+			c = ddr_bat_cap[1];
+		else
+			c = ddr_bat_cap[0];
+		cap = ddr_min_cap(cap, c);
+	}
+
+	if (screen_is_off)
+		cap = ddr_min_cap(cap, ddr_screen_off_cap);
+
+	return cap;
+}
+
+static void waltgov_ddr_work_fn(struct work_struct *work)
+{
+	unsigned int cap = waltgov_ddr_calc_cap();
+	int ret;
+
+	if ((int)cap == atomic_read(&walt_ddr_applied))
+		return;
+
+	ret = qcom_dcvs_set_max_freq(DCVS_DDR, cap);
+	if (ret) {
+		/* dcvs not ready yet etc.: keep old state, the next kick retries */
+		pr_debug("ddr cap %u failed: %d\n", cap, ret);
+		return;
+	}
+	atomic_set(&walt_ddr_applied, cap);
+	pr_debug("ddr cap -> %u kHz\n", cap);
+}
+
+static DECLARE_WORK(waltgov_ddr_work, waltgov_ddr_work_fn);
+
+/* safe from any context: the real work runs in a worker (it may sleep) */
+static void waltgov_ddr_kick(void)
+{
+	schedule_work(&waltgov_ddr_work);
+}
+
 static int waltgov_panel_notifier_callback(struct notifier_block *nb,
 					 unsigned long event, void *data)
 {
@@ -125,6 +218,7 @@ static int waltgov_panel_notifier_callback(struct notifier_block *nb,
 
 	if (event == PANEL_EVENT_STATE_CHANGED && evdata) {
 		screen_is_off = (evdata->state == PANEL_OFF);
+		waltgov_ddr_kick();
 	}
 	return NOTIFY_OK;
 }
@@ -176,6 +270,7 @@ static unsigned int apply_screen_off_logic(struct waltgov_cpu *wg_cpu, unsigned 
 void walt_update_thermal_temp(int temp)
 {
 	atomic_set(&walt_thermal_temp, temp);
+	waltgov_ddr_kick();
 }
 EXPORT_SYMBOL(walt_update_thermal_temp);
 
@@ -185,6 +280,7 @@ EXPORT_SYMBOL(walt_update_thermal_temp);
 void walt_update_battery_level(int pct)
 {
 	atomic_set(&walt_battery_pct, pct);
+	waltgov_ddr_kick();
 }
 EXPORT_SYMBOL(walt_update_battery_level);
 
@@ -194,6 +290,7 @@ EXPORT_SYMBOL(walt_update_battery_level);
 void walt_update_charging_status(int charging)
 {
 	atomic_set(&walt_is_charging, !!charging);
+	waltgov_ddr_kick();
 }
 EXPORT_SYMBOL(walt_update_charging_status);
 
@@ -988,6 +1085,7 @@ static ssize_t global_temp_store(struct gov_attr_set *attr_set, const char *buf,
 	int temp;
 	if (kstrtoint(buf, 10, &temp)) return -EINVAL;
 	atomic_set(&walt_thermal_temp, temp);
+	waltgov_ddr_kick();
 	return count;
 }
 
@@ -1004,6 +1102,7 @@ static ssize_t global_battery_store(struct gov_attr_set *attr_set, const char *b
 	int pct;
 	if (kstrtoint(buf, 10, &pct)) return -EINVAL;
 	atomic_set(&walt_battery_pct, pct);
+	waltgov_ddr_kick();
 	return count;
 }
 
@@ -1020,6 +1119,7 @@ static ssize_t global_charging_store(struct gov_attr_set *attr_set, const char *
 	int charging;
 	if (kstrtoint(buf, 10, &charging)) return -EINVAL;
 	atomic_set(&walt_is_charging, !!charging);
+	waltgov_ddr_kick();
 	return count;
 }
 
@@ -1225,6 +1325,47 @@ int cpufreq_walt_reset_adaptive_freq(unsigned int cpu)
 }
 EXPORT_SYMBOL(cpufreq_walt_reset_adaptive_freq);
 
+
+/* DDR throttle attributes (global, kHz, 0 = no cap) */
+#define DDR_CAP_ATTR(_name, _var)						\
+static ssize_t show_##_name(struct gov_attr_set *attr_set, char *buf)		\
+{										\
+	return scnprintf(buf, PAGE_SIZE, "%u\n", _var);				\
+}										\
+static ssize_t store_##_name(struct gov_attr_set *attr_set,			\
+			     const char *buf, size_t count)			\
+{										\
+	unsigned int val;							\
+										\
+	if (kstrtouint(buf, 10, &val))						\
+		return -EINVAL;							\
+	_var = val;								\
+	waltgov_ddr_kick();							\
+	return count;								\
+}										\
+WALTGOV_ATTR_RW(_name)
+
+DDR_CAP_ATTR(ddr_temp_45, ddr_temp_cap[0]);
+DDR_CAP_ATTR(ddr_temp_58, ddr_temp_cap[1]);
+DDR_CAP_ATTR(ddr_temp_61, ddr_temp_cap[2]);
+DDR_CAP_ATTR(ddr_temp_62, ddr_temp_cap[3]);
+DDR_CAP_ATTR(ddr_temp_63, ddr_temp_cap[4]);
+DDR_CAP_ATTR(ddr_temp_70, ddr_temp_cap[5]);
+DDR_CAP_ATTR(ddr_bat_100, ddr_bat_cap[0]);
+DDR_CAP_ATTR(ddr_bat_70, ddr_bat_cap[1]);
+DDR_CAP_ATTR(ddr_bat_50, ddr_bat_cap[2]);
+DDR_CAP_ATTR(ddr_bat_30, ddr_bat_cap[3]);
+DDR_CAP_ATTR(ddr_bat_20, ddr_bat_cap[4]);
+DDR_CAP_ATTR(ddr_bat_10, ddr_bat_cap[5]);
+DDR_CAP_ATTR(ddr_screen_off, ddr_screen_off_cap);
+
+/* currently applied cap, read only */
+static ssize_t ddr_cap_applied_show(struct gov_attr_set *attr_set, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d\n", atomic_read(&walt_ddr_applied));
+}
+static struct governor_attr ddr_cap_applied = __ATTR_RO(ddr_cap_applied);
+
 static struct attribute *waltgov_attributes[] = {
 	&up_rate_limit_us.attr,
 	&down_rate_limit_us.attr,
@@ -1268,6 +1409,20 @@ static struct attribute *waltgov_attributes[] = {
 	&cpu0_volt_margin_pct.attr,
 	&cpu3_volt_margin_pct.attr,
 	&cpu7_volt_margin_pct.attr,
+	&ddr_temp_45.attr,
+	&ddr_temp_58.attr,
+	&ddr_temp_61.attr,
+	&ddr_temp_62.attr,
+	&ddr_temp_63.attr,
+	&ddr_temp_70.attr,
+	&ddr_bat_100.attr,
+	&ddr_bat_70.attr,
+	&ddr_bat_50.attr,
+	&ddr_bat_30.attr,
+	&ddr_bat_20.attr,
+	&ddr_bat_10.attr,
+	&ddr_screen_off.attr,
+	&ddr_cap_applied.attr,
 	NULL
 };
 
