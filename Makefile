@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 VERSION = 5
 PATCHLEVEL = 15
-SUBLEVEL = 208
+SUBLEVEL = 220
 EXTRAVERSION =
 NAME = Trick or Treat
 
@@ -1222,11 +1222,6 @@ KBUILD_USERLDFLAGS += $(filter -m32 -m64 --target=%, $(KBUILD_CPPFLAGS) $(KBUILD
 # userspace programs are linked via the compiler, use the correct linker
 ifdef CONFIG_CC_IS_CLANG
 KBUILD_USERLDFLAGS += $(call cc-option, --ld-path=$(LD))
-endif
-
-# userspace programs are linked via the compiler, use the correct linker
-ifeq ($(CONFIG_CC_IS_CLANG)$(CONFIG_LD_IS_LLD),yy)
-KBUILD_USERLDFLAGS += $(call cc-option,  --plugin-opt=O3, --ld-path=$(LD))
 endif
 
 # make the checker run with the right architecture

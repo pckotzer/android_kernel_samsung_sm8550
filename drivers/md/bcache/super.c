@@ -1382,7 +1382,9 @@ static void cached_dev_free(struct closure *cl)
 	 * The sb_bio is embedded in struct cached_dev, so we must
 	 * ensure no I/O is in progress.
 	 */
+
 	closure_sync(&dc->sb_write);
+
 
 	if (dc->sb_disk)
 		put_page(virt_to_page(dc->sb_disk));

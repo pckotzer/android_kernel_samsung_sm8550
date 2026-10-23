@@ -1,8 +1,3 @@
-# SPDX-License-Identifier: GPL-2.0-only
-
-KCOV_INSTRUMENT := n
-KCSAN_SANITIZE := n
-
 obj-$(CONFIG_SCHED_WALT) += sched-walt.o
 
 # Base objects that are always compiled for WALT

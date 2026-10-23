@@ -61,6 +61,13 @@ static struct qcom_dcvs_data	*dcvs_data;
 
 static u32 get_target_freq(struct dcvs_path *path, u32 freq);
 
+/*
+ * Optional software ceiling per HW type in kHz (0 = no ceiling).
+ * Set with qcom_dcvs_set_max_freq(). Votes can only raise a frequency
+ * (they are aggregated with max()), so a throttle needs this clamp.
+ */
+static u32 dcvs_freq_cap[NUM_DCVS_HW_TYPES];
+
 struct qcom_dcvs_attr {
 	struct attribute	attr;
 	ssize_t (*show)(struct kobject *kobj, struct attribute *attr,
@@ -267,6 +274,7 @@ static u32 get_target_freq(struct dcvs_path *path, u32 freq)
 	u32 *freq_table = hw->freq_table;
 	u32 len = hw->table_len;
 	u32 target_freq = 0;
+	u32 cap;
 	int i;
 
 	if (path->type == DCVS_SLOW_PATH)
@@ -281,6 +289,17 @@ static u32 get_target_freq(struct dcvs_path *path, u32 freq)
 
 	if (i == len)
 		target_freq = freq_table[len-1];
+
+	/* software ceiling: round DOWN to a table entry, never exceed it */
+	cap = READ_ONCE(dcvs_freq_cap[hw->type]);
+	if (cap) {
+		u32 cap_tbl = freq_table[0];
+		u32 j;
+
+		for (j = 0; j < len && freq_table[j] <= cap; j++)
+			cap_tbl = freq_table[j];
+		target_freq = min(target_freq, cap_tbl);
+	}
 
 	return target_freq;
 }
@@ -570,6 +589,58 @@ int qcom_dcvs_hw_minmax_get(enum dcvs_hw_type hw_type, u32 *min, u32 *max)
 	return 0;
 }
 EXPORT_SYMBOL(qcom_dcvs_hw_minmax_get);
+
+/*
+ * qcom_dcvs_set_max_freq - throttle a DCVS HW to a maximum frequency
+ * @hw_type: e.g. DCVS_DDR
+ * @max_khz: ceiling in kHz, rounded down to the next table entry.
+ *           0 removes the ceiling.
+ *
+ * Sleeps (takes the slow path voter lock), so call it from process context.
+ * The slow path is re-committed immediately; fast and percpu paths pick the
+ * ceiling up with their next vote.
+ */
+int qcom_dcvs_set_max_freq(enum dcvs_hw_type hw_type, u32 max_khz)
+{
+	struct dcvs_hw *hw;
+	struct dcvs_path *path;
+	struct dcvs_voter *voter;
+	struct dcvs_freq new_freq;
+	int ret = 0;
+
+	if (hw_type >= NUM_DCVS_HW_TYPES)
+		return -EINVAL;
+
+	if (!dcvs_data || !dcvs_data->inited)
+		return -EPROBE_DEFER;
+
+	hw = dcvs_data->hw_devs[hw_type];
+	if (!hw)
+		return -ENODEV;
+
+	if (max_khz)
+		max_khz = clamp(max_khz, hw->hw_min_freq, hw->hw_max_freq);
+	WRITE_ONCE(dcvs_freq_cap[hw_type], max_khz);
+
+	path = hw->dcvs_paths[DCVS_SLOW_PATH];
+	if (!path)
+		return 0;
+
+	mutex_lock(&path->voter_lock);
+	new_freq.ib = new_freq.ab = 0;
+	new_freq.hw_type = hw_type;
+	list_for_each_entry(voter, &path->voter_list, node) {
+		new_freq.ib = max(voter->freq.ib, new_freq.ib);
+		new_freq.ab += voter->freq.ab;
+	}
+	new_freq.ib = get_target_freq(path, new_freq.ib);
+	if (new_freq.ib != path->cur_freq.ib)
+		ret = path->commit_dcvs_freqs(path, &new_freq, 1);
+	mutex_unlock(&path->voter_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(qcom_dcvs_set_max_freq);
 
 struct device_node *qcom_dcvs_get_ddr_child_node(
 				struct device_node *of_parent)

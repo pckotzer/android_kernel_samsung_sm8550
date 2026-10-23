@@ -31,6 +31,7 @@
 
 /* Added for WALT battery level integration */
 extern void walt_update_battery_level(int level);
+extern void walt_update_charging_status(int charging); 
 
 static unsigned int __read_mostly lpcharge;
 module_param(lpcharge, uint, 0444);
@@ -2442,11 +2443,13 @@ static int max77705_fg_set_property(struct power_supply *psy,
 			case SEC_BAT_CHG_MODE_BUCK_OFF:
 			case SEC_BAT_CHG_MODE_CHARGING_OFF:
 				fuelgauge->is_charging = false;
+				walt_update_charging_status(0);
 				max77705_offset_leakage(fuelgauge);
 				break;
 			case SEC_BAT_CHG_MODE_CHARGING:
 			case SEC_BAT_CHG_MODE_PASS_THROUGH:
 				fuelgauge->is_charging = true;
+				walt_update_charging_status(1); 
 				max77705_offset_leakage(fuelgauge);
 				break;
 			};
